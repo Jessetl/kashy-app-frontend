@@ -1,215 +1,168 @@
 import { NotificationButton } from '@/shared/presentation/components/notification-button';
 import { ThemeToggle } from '@/shared/presentation/components/theme-toggle';
-import { onThemeProfilerRender } from '@/shared/presentation/devtools/theme-profiler';
-import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
-import React, { Profiler } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ExchangeRateBanner } from '../components/exchange-rate-banner';
+import { FinanceOverview } from '../components/finance-overview';
+import { GuestCtaCard } from '../components/guest-cta-card';
+import { QuickActions } from '../components/quick-actions';
+import { ShoppingSnapshot } from '../components/shopping-snapshot';
+import { UpcomingDebts } from '../components/upcoming-debts';
+import { useHomeSummary } from '../hooks/use-home-summary';
 
 export default function HomeScreen() {
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
-  const { isAuthenticated, user } = useAuth();
 
-  const displayName = (isAuthenticated && user?.firstName) || 'Invitado';
+  const summary = useHomeSummary();
 
-  const initial = displayName.charAt(0).toUpperCase();
-
-  const content = (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[
-        styles.contentContainer,
-        { paddingTop: insets.top + 12, paddingBottom: 100 },
-      ]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View
-            style={[
-              styles.avatarSmall,
-              { backgroundColor: colors.primaryLight },
-            ]}
-          >
-            <Text style={[styles.avatarEmoji, { color: colors.primary }]}>
-              {initial}
-            </Text>
+  return (
+    <View style={[styles.flex, { paddingTop: insets.top }]}>
+      {/* Header — sobre el degradado */}
+      <View style={styles.headerContent}>
+        {/* Top bar */}
+        <View style={styles.topBar}>
+          <View style={styles.topBarLeft}>
+            <View
+              style={[
+                styles.avatar,
+                { backgroundColor: 'rgba(99,230,150,0.2)' },
+              ]}
+            >
+              <Text style={[styles.avatarText, { color: colors.primary }]}>
+                {summary.initial}
+              </Text>
+            </View>
+            <View>
+              <Text style={[styles.greeting, { color: colors.text }]}>
+                Hola, {summary.displayName}
+              </Text>
+              <Text
+                style={[
+                  styles.subGreeting,
+                  { color: 'rgba(255,255,255,0.65)' },
+                ]}
+              >
+                {summary.isAuthenticated
+                  ? 'Bienvenido de vuelta'
+                  : 'Modo invitado'}
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text style={[styles.greeting, { color: colors.text }]}>
-              Hola, {displayName}!
-            </Text>
-            <Text style={[styles.subGreeting, { color: colors.gradientEnd }]}>
-              {isAuthenticated ? 'Ver perfil' : 'Modo invitado'}
-            </Text>
+          <View style={styles.topBarRight}>
+            <NotificationButton
+              badgeCount={
+                summary.isAuthenticated ? summary.overdueCount : 0
+              }
+            />
+            <ThemeToggle />
           </View>
         </View>
-        <View style={styles.headerRight}>
-          <NotificationButton badgeCount={isAuthenticated ? 2 : 0} />
-          <ThemeToggle />
-        </View>
+
+        {/* Exchange rate */}
+        <ExchangeRateBanner
+          rate={summary.exchangeRate}
+          source={summary.exchangeSource}
+          isLoading={summary.isRateLoading}
+        />
       </View>
 
-      {/* Resumen title */}
-      <Text style={[styles.sectionTitle, { color: colors.text }]}>Resumen</Text>
+      {/* Content — fondo blanco, sube sobre el header */}
+      <View
+        style={[
+          styles.contentSection,
+          { backgroundColor: colors.backgroundSecondary },
+        ]}
+      >
+        {/* Quick Actions */}
+        <QuickActions />
 
-      {/* Supermercado Section */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionLabel, { color: colors.primary }]}>
-          SUPERMERCADO
-        </Text>
-        <View
-          style={[
-            styles.supermarketCard,
-            { backgroundColor: colors.backgroundSecondary },
-          ]}
-        >
-          <Text style={[styles.cardTitle, { color: colors.textOnSurface }]}>
-            Nueva Lista
-          </Text>
-          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]}>
-            0 items agregados
-          </Text>
-        </View>
-      </View>
+        {/* Shopping Snapshot */}
+        <ShoppingSnapshot
+          listName={summary.activeListName}
+          totalItems={summary.activeListItemCount}
+          purchasedItems={summary.activeListPurchasedCount}
+          totalLocal={summary.activeListTotalLocal}
+          exchangeRate={summary.exchangeRate}
+        />
 
-      {/* Deudas Section */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionLabel, { color: colors.primary }]}>
-          DEUDAS & COBROS
-        </Text>
-        <View style={styles.debtRow}>
-          <View
-            style={[
-              styles.debtCard,
-              { backgroundColor: colors.backgroundSecondary },
-            ]}
-          >
-            <Text style={[styles.debtLabel, { color: colors.danger }]}>
-              Deudas por Pagar
-            </Text>
-            <Text style={[styles.debtAmount, { color: colors.textOnSurface }]}>
-              $0.00
-            </Text>
-          </View>
-          <View
-            style={[
-              styles.debtCard,
-              { backgroundColor: colors.backgroundSecondary },
-            ]}
-          >
-            <Text style={[styles.debtLabel, { color: colors.primary }]}>
-              Cobros Pendientes
-            </Text>
-            <Text style={[styles.debtAmount, { color: colors.textOnSurface }]}>
-              $0.00
-            </Text>
-          </View>
-        </View>
+        {/* Finance Overview (auth only) */}
+        {summary.isAuthenticated && (
+          <FinanceOverview
+            totalDebts={summary.totalDebts}
+            totalCollections={summary.totalCollections}
+            balance={summary.balance}
+            overdueCount={summary.overdueCount}
+          />
+        )}
+
+        {/* Upcoming Debts (auth only) */}
+        {summary.isAuthenticated && (
+          <UpcomingDebts debts={summary.upcomingDebts} />
+        )}
+
+        {/* Guest CTA */}
+        {!summary.isAuthenticated && <GuestCtaCard />}
       </View>
-    </ScrollView>
+    </View>
   );
-
-  if (__DEV__) {
-    return (
-      <Profiler id='HomeScreen' onRender={onThemeProfilerRender}>
-        {content}
-      </Profiler>
-    );
-  }
-
-  return content;
 }
 
 const styles = StyleSheet.create({
-  container: {
+  flex: {
     flex: 1,
   },
-  contentContainer: {
+  headerContent: {
     paddingHorizontal: 20,
-    gap: 20,
+    gap: 16,
+    paddingTop: 12,
+    paddingBottom: 32,
   },
-  header: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerLeft: {
+  topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
   },
-  headerRight: {
+  topBarRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  avatarSmall: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  avatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarEmoji: {
-    fontSize: 18,
+  avatarText: {
+    fontSize: 19,
     fontWeight: '700',
   },
   greeting: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     letterSpacing: -0.3,
   },
   subGreeting: {
     fontSize: 13,
     fontWeight: '400',
+    marginTop: 1,
   },
-  sectionTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: -0.5,
-  },
-  section: {
-    gap: 10,
-  },
-  sectionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  supermarketCard: {
-    borderRadius: 16,
-    padding: 20,
-    gap: 4,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  cardSubtitle: {
-    fontSize: 14,
-    fontWeight: '400',
-  },
-  debtRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  debtCard: {
+  contentSection: {
     flex: 1,
-    borderRadius: 16,
-    padding: 16,
-    gap: 6,
-  },
-  debtLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  debtAmount: {
-    fontSize: 22,
-    fontWeight: '700',
-    letterSpacing: -0.3,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 24,
+    gap: 24,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
   },
 });
