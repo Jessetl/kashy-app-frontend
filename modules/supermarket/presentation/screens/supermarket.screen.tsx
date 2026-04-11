@@ -1,4 +1,5 @@
 import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
+import { ParallaxScrollView } from '@/shared/presentation/components/parallax-scroll-view';
 import { BottomSheetModal } from '@/shared/presentation/components/ui/bottom-sheet-modal';
 import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
@@ -31,7 +32,6 @@ import { CategoryTabs } from '../components/category-tabs';
 import { EmptyList } from '../components/empty-list';
 import { ListHeaderBar } from '../components/list-header-bar';
 import { ListSettingsRow } from '../components/list-settings-row';
-import { ParallaxScrollView } from '../components/parallax-scroll-view';
 import { ProductCounter } from '../components/product-counter';
 import { SaveListForm } from '../components/save-list-form';
 import { SavedListsSheet } from '../components/saved-lists-sheet';
@@ -308,7 +308,6 @@ export default function SupermarketScreen() {
         />
         <ParallaxScrollView
           intensity={parallaxIntensity}
-          bottomPadding={8}
           contentContainerStyle={styles.scrollContent}
           headerStyle={styles.headerContainer}
           contentStyle={[

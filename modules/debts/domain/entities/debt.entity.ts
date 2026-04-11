@@ -1,5 +1,5 @@
 /** Prioridad de una deuda */
-export type DebtPriority = 'high' | 'medium' | 'low';
+export type DebtPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 
 /** Deuda o cobro */
 export interface Debt {
@@ -52,9 +52,9 @@ export const DEBT_PRIORITIES: {
   label: string;
   icon: string;
 }[] = [
-  { key: 'high', label: 'Alta', icon: 'alert-circle' },
-  { key: 'medium', label: 'Media', icon: 'minus-circle' },
-  { key: 'low', label: 'Baja', icon: 'arrow-down-circle' },
+  { key: 'HIGH', label: 'Alta', icon: 'alert-circle' },
+  { key: 'MEDIUM', label: 'Media', icon: 'minus-circle' },
+  { key: 'LOW', label: 'Baja', icon: 'arrow-down-circle' },
 ];
 
 /** Calcula el monto de interés */

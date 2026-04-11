@@ -114,6 +114,7 @@ export const useDebtStore = create<DebtState>()((set, get) => ({
       const message =
         err instanceof Error ? err.message : 'No se pudo crear la deuda';
       set({ error: message, isLoading: false });
+      throw err;
     }
   },
 
@@ -129,6 +130,7 @@ export const useDebtStore = create<DebtState>()((set, get) => ({
       const message =
         err instanceof Error ? err.message : 'No se pudo actualizar la deuda';
       set({ error: message });
+      throw err;
     }
   },
 
@@ -144,6 +146,7 @@ export const useDebtStore = create<DebtState>()((set, get) => ({
       const message =
         err instanceof Error ? err.message : 'No se pudo eliminar la deuda';
       set({ error: message });
+      throw err;
     }
   },
 
@@ -159,6 +162,7 @@ export const useDebtStore = create<DebtState>()((set, get) => ({
       const message =
         err instanceof Error ? err.message : 'No se pudo marcar como pagada';
       set({ error: message });
+      throw err;
     }
   },
 

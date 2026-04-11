@@ -11,15 +11,15 @@ interface PriorityFilterProps {
 
 const FILTERS: { key: DebtPriority | null; label: string }[] = [
   { key: null, label: 'Todas' },
-  { key: 'high', label: 'Alta' },
-  { key: 'medium', label: 'Media' },
-  { key: 'low', label: 'Baja' },
+  { key: 'HIGH', label: 'Alta' },
+  { key: 'MEDIUM', label: 'Media' },
+  { key: 'LOW', label: 'Baja' },
 ];
 
 const PRIORITY_COLORS: Record<string, string> = {
-  high: '#FF8C66',
-  medium: '#FFB84D',
-  low: '#63E696',
+  HIGH: '#FF8C66',
+  MEDIUM: '#FFB84D',
+  LOW: '#63E696',
 };
 
 export const PriorityFilter = React.memo(function PriorityFilter({

@@ -22,7 +22,7 @@ const INITIAL_STATE: DebtFormState = {
   title: '',
   description: '',
   amountUsd: '',
-  priority: 'medium',
+  priority: 'MEDIUM',
   interestRatePct: '',
   dueDate: '',
   isCollection: false,
@@ -46,6 +46,7 @@ export function useDebtForm(editingDebt?: Debt | null) {
     editingDebt ? debtToFormState(editingDebt) : INITIAL_STATE,
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const createDebt = useDebtStore((s) => s.createDebt);
   const updateDebt = useDebtStore((s) => s.updateDebt);
@@ -72,6 +73,7 @@ export function useDebtForm(editingDebt?: Debt | null) {
     if (!isValid) return false;
 
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       if (editingDebt) {
         const data: UpdateDebtInput = {
@@ -97,7 +99,10 @@ export function useDebtForm(editingDebt?: Debt | null) {
         await createDebt(input);
       }
       return true;
-    } catch {
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : 'Ocurrió un error inesperado';
+      setSubmitError(message);
       return false;
     } finally {
       setIsSubmitting(false);
@@ -117,6 +122,7 @@ export function useDebtForm(editingDebt?: Debt | null) {
     setField,
     isValid,
     isSubmitting,
+    submitError,
     interestAmount,
     totalWithInterest,
     reset,

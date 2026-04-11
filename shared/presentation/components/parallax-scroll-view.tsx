@@ -1,7 +1,7 @@
 import type { PropsWithChildren, ReactNode } from 'react';
 import React from 'react';
 import type { ScrollViewProps, StyleProp, ViewStyle } from 'react-native';
-import { StyleSheet, View } from 'react-native';
+import { RefreshControl, StyleSheet, View } from 'react-native';
 import Animated, {
   Extrapolation,
   interpolate,
@@ -27,6 +27,9 @@ type ParallaxScrollViewProps = PropsWithChildren<{
   bottomPadding?: number;
   showsVerticalScrollIndicator?: boolean;
   keyboardShouldPersistTaps?: ScrollViewProps['keyboardShouldPersistTaps'];
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  refreshTintColor?: string;
 }>;
 
 const DEFAULT_CONFIG = {
@@ -46,6 +49,9 @@ export function ParallaxScrollView({
   bottomPadding = 0,
   showsVerticalScrollIndicator = false,
   keyboardShouldPersistTaps = 'handled',
+  refreshing,
+  onRefresh,
+  refreshTintColor,
 }: ParallaxScrollViewProps) {
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
   const scrollOffset = useScrollOffset(scrollRef);
@@ -88,6 +94,15 @@ export function ParallaxScrollView({
     pullDownScale,
   ]);
 
+  const refreshControl =
+    onRefresh != null ? (
+      <RefreshControl
+        refreshing={refreshing ?? false}
+        onRefresh={onRefresh}
+        tintColor={refreshTintColor}
+      />
+    ) : undefined;
+
   return (
     <Animated.ScrollView
       ref={scrollRef}
@@ -100,6 +115,7 @@ export function ParallaxScrollView({
       scrollEventThrottle={16}
       showsVerticalScrollIndicator={showsVerticalScrollIndicator}
       keyboardShouldPersistTaps={keyboardShouldPersistTaps}
+      refreshControl={refreshControl}
     >
       <Animated.View style={[styles.header, headerStyle, headerAnimatedStyle]}>
         {header}

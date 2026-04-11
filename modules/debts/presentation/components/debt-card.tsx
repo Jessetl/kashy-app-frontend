@@ -26,9 +26,9 @@ const PRIORITY_CONFIG: Record<
   DebtPriority,
   { color: string; Icon: typeof AlertCircle }
 > = {
-  high: { color: '#FF8C66', Icon: AlertCircle },
-  medium: { color: '#FFB84D', Icon: MinusCircle },
-  low: { color: '#63E696', Icon: ArrowDownCircle },
+  HIGH: { color: '#FF8C66', Icon: AlertCircle },
+  MEDIUM: { color: '#FFB84D', Icon: MinusCircle },
+  LOW: { color: '#63E696', Icon: ArrowDownCircle },
 };
 
 const formatter = new Intl.NumberFormat('en-US', {

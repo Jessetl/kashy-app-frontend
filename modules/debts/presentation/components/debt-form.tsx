@@ -1,4 +1,5 @@
 import { AppPressable } from '@/shared/presentation/components/ui';
+import { ErrorBanner } from '@/shared/presentation/components/ui/error-banner';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { DollarSign, Percent } from 'lucide-react-native';
 import React, { useCallback, useRef } from 'react';
@@ -22,9 +23,9 @@ interface DebtFormProps {
 }
 
 const PRIORITIES: { key: DebtPriority; label: string; color: string }[] = [
-  { key: 'high', label: 'Alta', color: '#FF8C66' },
-  { key: 'medium', label: 'Media', color: '#FFB84D' },
-  { key: 'low', label: 'Baja', color: '#63E696' },
+  { key: 'HIGH', label: 'Alta', color: '#FF8C66' },
+  { key: 'MEDIUM', label: 'Media', color: '#FFB84D' },
+  { key: 'LOW', label: 'Baja', color: '#63E696' },
 ];
 
 const formatter = new Intl.NumberFormat('en-US', {
@@ -44,6 +45,7 @@ export const DebtForm = React.memo(function DebtForm({
     setField,
     isValid,
     isSubmitting,
+    submitError,
     interestAmount,
     totalWithInterest,
     submit,
@@ -75,14 +77,10 @@ export const DebtForm = React.memo(function DebtForm({
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
+        keyboardShouldPersistTaps='handled'
       >
         <Text style={[styles.formTitle, { color: colors.textOnSurface }]}>
-          {isEditing
-            ? 'Editar'
-            : isCollection
-              ? 'Nuevo Cobro'
-              : 'Nueva Deuda'}
+          {isEditing ? 'Editar' : isCollection ? 'Nuevo Cobro' : 'Nueva Deuda'}
         </Text>
 
         {/* Título */}
@@ -101,9 +99,9 @@ export const DebtForm = React.memo(function DebtForm({
             ]}
             value={form.title}
             onChangeText={(v) => setField('title', v)}
-            placeholder="Ej: Juan Pérez"
+            placeholder='Ej: Juan Pérez'
             placeholderTextColor={colors.textTertiary}
-            returnKeyType="next"
+            returnKeyType='next'
             onSubmitEditing={() => amountRef.current?.focus()}
           />
         </View>
@@ -125,17 +123,17 @@ export const DebtForm = React.memo(function DebtForm({
             <DollarSign
               size={18}
               color={colors.textSecondary}
-              pointerEvents="none"
+              pointerEvents='none'
             />
             <TextInput
               ref={amountRef}
               style={[styles.inputInner, { color: colors.textOnSurface }]}
               value={form.amountUsd}
               onChangeText={(v) => setField('amountUsd', v)}
-              placeholder="0.00"
+              placeholder='0.00'
               placeholderTextColor={colors.textTertiary}
-              keyboardType="decimal-pad"
-              returnKeyType="next"
+              keyboardType='decimal-pad'
+              returnKeyType='next'
               onSubmitEditing={() => descriptionRef.current?.focus()}
             />
           </View>
@@ -159,11 +157,11 @@ export const DebtForm = React.memo(function DebtForm({
             ]}
             value={form.description}
             onChangeText={(v) => setField('description', v)}
-            placeholder="Detalle de la deuda..."
+            placeholder='Detalle de la deuda...'
             placeholderTextColor={colors.textTertiary}
             multiline
             numberOfLines={3}
-            textAlignVertical="top"
+            textAlignVertical='top'
           />
         </View>
 
@@ -182,7 +180,9 @@ export const DebtForm = React.memo(function DebtForm({
                   style={[
                     styles.priorityChip,
                     {
-                      backgroundColor: isActive ? color : colors.backgroundTertiary,
+                      backgroundColor: isActive
+                        ? color
+                        : colors.backgroundTertiary,
                       borderColor: isActive ? color : colors.border,
                     },
                   ]}
@@ -218,15 +218,15 @@ export const DebtForm = React.memo(function DebtForm({
             <Percent
               size={18}
               color={colors.textSecondary}
-              pointerEvents="none"
+              pointerEvents='none'
             />
             <TextInput
               style={[styles.inputInner, { color: colors.textOnSurface }]}
               value={form.interestRatePct}
               onChangeText={(v) => setField('interestRatePct', v)}
-              placeholder="0"
+              placeholder='0'
               placeholderTextColor={colors.textTertiary}
-              keyboardType="decimal-pad"
+              keyboardType='decimal-pad'
             />
           </View>
           {interestAmount > 0 && (
@@ -253,11 +253,14 @@ export const DebtForm = React.memo(function DebtForm({
             ]}
             value={form.dueDate}
             onChangeText={(v) => setField('dueDate', v)}
-            placeholder="YYYY-MM-DD"
+            placeholder='YYYY-MM-DD'
             placeholderTextColor={colors.textTertiary}
-            keyboardType="numbers-and-punctuation"
+            keyboardType='numbers-and-punctuation'
           />
         </View>
+
+        {/* Error */}
+        <ErrorBanner message={submitError} />
 
         {/* Botones */}
         <View style={styles.buttonRow}>

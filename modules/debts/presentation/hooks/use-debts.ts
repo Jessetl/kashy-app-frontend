@@ -1,5 +1,6 @@
 import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
 import { useCallback, useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 import type { Debt, DebtPriority } from '../../domain/entities/debt.entity';
 import { useDebtStore, type DebtTab } from '../../infrastructure/store/debt.store';
 
@@ -50,14 +51,43 @@ export function useDebts() {
 
   const handleMarkAsPaid = useCallback(
     (id: string) => {
-      requireAuth(() => void markAsPaid(id));
+      requireAuth(() => {
+        const isCollection = activeTab === 'collections';
+        Alert.alert(
+          isCollection ? 'Confirmar cobro' : 'Confirmar pago',
+          isCollection
+            ? '¿Seguro que deseas marcar este cobro como recibido?'
+            : '¿Seguro que deseas marcar esta deuda como pagada?',
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: isCollection ? 'Cobrado' : 'Pagada',
+              onPress: () => {
+                void markAsPaid(id).catch((err: unknown) => {
+                  const message =
+                    err instanceof Error
+                      ? err.message
+                      : 'No se pudo completar la acción';
+                  Alert.alert('Error', message);
+                });
+              },
+            },
+          ],
+        );
+      });
     },
-    [requireAuth, markAsPaid],
+    [requireAuth, markAsPaid, activeTab],
   );
 
   const handleDelete = useCallback(
     (id: string) => {
-      requireAuth(() => void deleteDebt(id));
+      requireAuth(() => {
+        void deleteDebt(id).catch((err: unknown) => {
+          const message =
+            err instanceof Error ? err.message : 'No se pudo eliminar la deuda';
+          Alert.alert('Error', message);
+        });
+      });
     },
     [requireAuth, deleteDebt],
   );

@@ -11,11 +11,16 @@ function buildQueryString(filters?: DebtFilters): string {
   if (!filters) return '';
 
   const params = new URLSearchParams();
-  if (filters.priority) params.set('priority', filters.priority);
-  if (filters.isCollection !== undefined)
+
+  if (filters.priority) {
+    params.set('priority', filters.priority);
+  }
+  if (filters.isCollection !== undefined) {
     params.set('is_collection', String(filters.isCollection));
-  if (filters.isPaid !== undefined)
+  }
+  if (filters.isPaid !== undefined) {
     params.set('is_paid', String(filters.isPaid));
+  }
 
   const qs = params.toString();
   return qs ? `?${qs}` : '';

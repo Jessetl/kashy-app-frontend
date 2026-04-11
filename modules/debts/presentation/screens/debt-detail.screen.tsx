@@ -1,6 +1,10 @@
-import { AppPressable } from '@/shared/presentation/components/ui';
-import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
+import {
+  AppPressable,
+  BottomSheetModal,
+} from '@/shared/presentation/components/ui';
+import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   AlertCircle,
   ArrowDownCircle,
@@ -12,29 +16,20 @@ import {
   Trash2,
 } from 'lucide-react-native';
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
 import type { Debt, DebtPriority } from '../../domain/entities/debt.entity';
 import {
   calculateTotalWithInterest,
   isOverdue,
 } from '../../domain/entities/debt.entity';
-import { useDebtStore } from '../../infrastructure/store/debt.store';
 import { DebtDatasource } from '../../infrastructure/datasources/debt.datasource';
-import { BottomSheetModal } from '@/shared/presentation/components/ui';
+import { useDebtStore } from '../../infrastructure/store/debt.store';
 import { DebtForm } from '../components/debt-form';
 
 const datasource = new DebtDatasource();
 
 const formatter = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
@@ -42,9 +37,9 @@ const PRIORITY_CONFIG: Record<
   DebtPriority,
   { label: string; color: string; Icon: typeof AlertCircle }
 > = {
-  high: { label: 'Alta', color: '#FF8C66', Icon: AlertCircle },
-  medium: { label: 'Media', color: '#FFB84D', Icon: MinusCircle },
-  low: { label: 'Baja', color: '#63E696', Icon: ArrowDownCircle },
+  HIGH: { label: 'Alta', color: '#FF8C66', Icon: AlertCircle },
+  MEDIUM: { label: 'Media', color: '#FFB84D', Icon: MinusCircle },
+  LOW: { label: 'Baja', color: '#63E696', Icon: ArrowDownCircle },
 };
 
 export default function DebtDetailScreen() {
@@ -79,10 +74,33 @@ export default function DebtDetailScreen() {
     void loadDebt();
   }, [loadDebt]);
 
-  const handleMarkAsPaid = useCallback(async () => {
+  const handleMarkAsPaid = useCallback(() => {
     if (!debt) return;
-    await markAsPaid(debt.id);
-    setDebt((prev) => (prev ? { ...prev, isPaid: true } : prev));
+    const isCollection = debt.isCollection;
+    Alert.alert(
+      isCollection ? 'Confirmar cobro' : 'Confirmar pago',
+      isCollection
+        ? '¿Seguro que deseas marcar este cobro como recibido?'
+        : '¿Seguro que deseas marcar esta deuda como pagada?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: isCollection ? 'Cobrado' : 'Pagada',
+          onPress: async () => {
+            try {
+              await markAsPaid(debt.id);
+              setDebt((prev) => (prev ? { ...prev, isPaid: true } : prev));
+            } catch (err) {
+              const message =
+                err instanceof Error
+                  ? err.message
+                  : 'No se pudo completar la acción';
+              Alert.alert('Error', message);
+            }
+          },
+        },
+      ],
+    );
   }, [debt, markAsPaid]);
 
   const handleDelete = useCallback(() => {
@@ -93,8 +111,16 @@ export default function DebtDetailScreen() {
         text: 'Eliminar',
         style: 'destructive',
         onPress: async () => {
-          await deleteDebt(debt.id);
-          router.back();
+          try {
+            await deleteDebt(debt.id);
+            router.back();
+          } catch (err) {
+            const message =
+              err instanceof Error
+                ? err.message
+                : 'No se pudo eliminar la deuda';
+            Alert.alert('Error', message);
+          }
         },
       },
     ]);
@@ -121,7 +147,10 @@ export default function DebtDetailScreen() {
   }
 
   const priority = PRIORITY_CONFIG[debt.priority];
-  const total = calculateTotalWithInterest(debt.amountUsd, debt.interestRatePct);
+  const total = calculateTotalWithInterest(
+    debt.amountUsd,
+    debt.interestRatePct,
+  );
   const exchangeRate = rate?.rateLocalPerUsd ?? null;
   const localAmount = exchangeRate ? total * exchangeRate : null;
   const overdue = isOverdue(debt.dueDate);
@@ -150,20 +179,23 @@ export default function DebtDetailScreen() {
             onPress={() => router.back()}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <ArrowLeft size={24} color={colors.text} pointerEvents="none" />
+            <ArrowLeft size={24} color={colors.text} pointerEvents='none' />
           </AppPressable>
           <View style={styles.topActions}>
             <AppPressable
               onPress={() => setShowEditForm(true)}
-              style={[styles.iconBtn, { backgroundColor: colors.backgroundSecondary }]}
+              style={[
+                styles.iconBtn,
+                { backgroundColor: colors.backgroundSecondary },
+              ]}
             >
-              <Edit3 size={18} color={colors.primary} pointerEvents="none" />
+              <Edit3 size={18} color={colors.primary} pointerEvents='none' />
             </AppPressable>
             <AppPressable
               onPress={handleDelete}
               style={[styles.iconBtn, { backgroundColor: colors.dangerLight }]}
             >
-              <Trash2 size={18} color={colors.danger} pointerEvents="none" />
+              <Trash2 size={18} color={colors.danger} pointerEvents='none' />
             </AppPressable>
           </View>
         </View>
@@ -216,7 +248,9 @@ export default function DebtDetailScreen() {
 
           {debt.interestRatePct > 0 && (
             <View style={styles.interestRow}>
-              <Text style={[styles.interestDetail, { color: colors.textSecondary }]}>
+              <Text
+                style={[styles.interestDetail, { color: colors.textSecondary }]}
+              >
                 Capital: ${formatter.format(debt.amountUsd)}
               </Text>
               <Text style={[styles.interestDetail, { color: colors.warning }]}>
@@ -228,15 +262,16 @@ export default function DebtDetailScreen() {
 
           {localAmount !== null && (
             <View
-              style={[
-                styles.localRow,
-                { borderTopColor: colors.borderLight },
-              ]}
+              style={[styles.localRow, { borderTopColor: colors.borderLight }]}
             >
-              <Text style={[styles.localLabel, { color: colors.textSecondary }]}>
+              <Text
+                style={[styles.localLabel, { color: colors.textSecondary }]}
+              >
                 Equivalente VES
               </Text>
-              <Text style={[styles.localValue, { color: colors.textOnSurface }]}>
+              <Text
+                style={[styles.localValue, { color: colors.textOnSurface }]}
+              >
                 Bs. {formatter.format(localAmount)}
               </Text>
             </View>
@@ -252,7 +287,11 @@ export default function DebtDetailScreen() {
               { backgroundColor: colors.backgroundSecondary },
             ]}
           >
-            <priority.Icon size={20} color={priority.color} pointerEvents="none" />
+            <priority.Icon
+              size={20}
+              color={priority.color}
+              pointerEvents='none'
+            />
             <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
               Prioridad
             </Text>
@@ -271,7 +310,7 @@ export default function DebtDetailScreen() {
             <Check
               size={20}
               color={debt.isPaid ? colors.success : colors.textSecondary}
-              pointerEvents="none"
+              pointerEvents='none'
             />
             <Text style={[styles.infoLabel, { color: colors.textSecondary }]}>
               Estado
@@ -301,7 +340,7 @@ export default function DebtDetailScreen() {
             <Calendar
               size={20}
               color={overdue ? colors.danger : colors.textSecondary}
-              pointerEvents="none"
+              pointerEvents='none'
             />
             <View style={styles.dateContent}>
               <Text style={[styles.dateLabel, { color: colors.textSecondary }]}>
@@ -330,7 +369,7 @@ export default function DebtDetailScreen() {
             onPress={handleMarkAsPaid}
             style={[styles.payButton, { backgroundColor: colors.primary }]}
           >
-            <Check size={20} color={colors.textInverse} pointerEvents="none" />
+            <Check size={20} color={colors.textInverse} pointerEvents='none' />
             <Text style={[styles.payButtonText, { color: colors.textInverse }]}>
               Marcar como pagada
             </Text>

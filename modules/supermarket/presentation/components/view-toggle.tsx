@@ -1,6 +1,6 @@
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
-import { FilePlus, LayoutGrid, List } from 'lucide-react-native';
+import { Eraser, LayoutGrid, List } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -38,7 +38,7 @@ export const ViewToggle = React.memo(function ViewToggle({
               },
             ]}
           >
-            <FilePlus
+            <Eraser
               pointerEvents='none'
               size={16}
               color={colors.textSecondary}
