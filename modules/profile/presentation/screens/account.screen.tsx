@@ -32,6 +32,7 @@ export default function AccountScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [passwordLoading, setPasswordLoading] = useState(false);
 
   const nameChanged =
@@ -153,59 +154,58 @@ export default function AccountScreen() {
               { backgroundColor: colors.backgroundSecondary },
             ]}
           >
-            <View style={styles.passwordField}>
-              <View style={styles.flex}>
-                <AppTextInput
-                  label='Contraseña actual'
-                  placeholder='********'
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  secureTextEntry={!showCurrent}
-                  autoCapitalize='none'
-                />
-              </View>
-              <AppPressable
-                onPress={() => setShowCurrent((v) => !v)}
-                style={styles.eyeBtn}
-              >
-                {showCurrent ? (
-                  <EyeOff size={18} color={colors.textTertiary} />
-                ) : (
-                  <Eye size={18} color={colors.textTertiary} />
-                )}
-              </AppPressable>
-            </View>
-            <View style={styles.passwordField}>
-              <View style={styles.flex}>
-                <AppTextInput
-                  label='Nueva contraseña'
-                  placeholder='Min. 6 caracteres'
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry={!showNew}
-                  autoCapitalize='none'
-                />
-              </View>
-              <AppPressable
-                onPress={() => setShowNew((v) => !v)}
-                style={styles.eyeBtn}
-              >
-                {showNew ? (
-                  <EyeOff size={18} color={colors.textTertiary} />
-                ) : (
-                  <Eye size={18} color={colors.textTertiary} />
-                )}
-              </AppPressable>
-            </View>
+            <AppTextInput
+              label='Contraseña actual'
+              placeholder='********'
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+              secureTextEntry={!showCurrent}
+              autoCapitalize='none'
+              rightElement={
+                <AppPressable onPress={() => setShowCurrent((v) => !v)} style={styles.eyeBtn}>
+                  {showCurrent ? (
+                    <EyeOff size={18} color={colors.textTertiary} pointerEvents='none' />
+                  ) : (
+                    <Eye size={18} color={colors.textTertiary} pointerEvents='none' />
+                  )}
+                </AppPressable>
+              }
+            />
+            <AppTextInput
+              label='Nueva contraseña'
+              placeholder='Min. 6 caracteres'
+              value={newPassword}
+              onChangeText={setNewPassword}
+              secureTextEntry={!showNew}
+              autoCapitalize='none'
+              rightElement={
+                <AppPressable onPress={() => setShowNew((v) => !v)} style={styles.eyeBtn}>
+                  {showNew ? (
+                    <EyeOff size={18} color={colors.textTertiary} pointerEvents='none' />
+                  ) : (
+                    <Eye size={18} color={colors.textTertiary} pointerEvents='none' />
+                  )}
+                </AppPressable>
+              }
+            />
             <AppTextInput
               label='Confirmar contraseña'
               placeholder='Repite la nueva contraseña'
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              secureTextEntry={!showNew}
+              secureTextEntry={!showConfirm}
               autoCapitalize='none'
               hasError={
                 confirmPassword.length > 0 && newPassword !== confirmPassword
+              }
+              rightElement={
+                <AppPressable onPress={() => setShowConfirm((v) => !v)} style={styles.eyeBtn}>
+                  {showConfirm ? (
+                    <EyeOff size={18} color={colors.textTertiary} pointerEvents='none' />
+                  ) : (
+                    <Eye size={18} color={colors.textTertiary} pointerEvents='none' />
+                  )}
+                </AppPressable>
               }
             />
             {confirmPassword.length > 0 && newPassword !== confirmPassword && (
@@ -279,13 +279,8 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     flexShrink: 1,
   },
-  passwordField: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 4,
-  },
   eyeBtn: {
-    width: 40,
+    width: 44,
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',

@@ -56,7 +56,17 @@ export function useDebtForm(editingDebt?: Debt | null) {
   const interestAmount = calculateInterest(amount, interestRate);
   const totalWithInterest = amount + interestAmount;
 
-  const isValid = form.title.trim().length > 0 && amount > 0;
+  const hasPastDueDate = (() => {
+    if (!form.dueDate) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const [y, m, d] = form.dueDate.split('-').map(Number);
+    const due = new Date(y, m - 1, d);
+    return due < today;
+  })();
+
+  const isValid =
+    form.title.trim().length > 0 && amount > 0 && !hasPastDueDate;
 
   const setField = useCallback(
     <K extends keyof DebtFormState>(key: K, value: DebtFormState[K]) => {

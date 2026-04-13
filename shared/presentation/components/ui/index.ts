@@ -1,4 +1,5 @@
 export { AppButton } from './app-button';
+export { AppCalendarInput } from './app-calendar-input';
 export { AppPressable } from './app-pressable';
 export { AppTextInput } from './app-text-input';
 export { BottomSheetModal } from './bottom-sheet-modal';

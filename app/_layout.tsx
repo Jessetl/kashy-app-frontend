@@ -3,6 +3,7 @@ import { useSessionRestore } from '@/modules/auth/presentation/hooks/use-session
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { useLocationStore } from '@/shared/infrastructure/location/location.store';
 import { AppThemeProvider } from '@/shared/infrastructure/theme';
+import { usePushNotifications } from '@/shared/presentation/hooks/use-push-notifications';
 import { Stack } from 'expo-router';
 import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
@@ -19,6 +20,9 @@ function AuthModalGlobal() {
 function AppContent() {
   // Restaurar sesión silenciosamente al abrir la app
   useSessionRestore();
+
+  // Inicializar push notifications (permisos, token, listeners)
+  usePushNotifications();
 
   // Solicitar permisos de localización al iniciar la app
   const requestLocation = useLocationStore((s) => s.requestLocation);

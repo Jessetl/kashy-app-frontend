@@ -13,11 +13,14 @@ interface AppTextInputProps extends Omit<TextInputProps, 'style'> {
   label?: string;
   /** Mostrar borde rojo de error */
   hasError?: boolean;
+  /** Elemento renderizado dentro del input, a la derecha */
+  rightElement?: React.ReactNode;
 }
 
 export const AppTextInput = React.memo(function AppTextInput({
   label,
   hasError = false,
+  rightElement,
   ...inputProps
 }: AppTextInputProps) {
   const colors = useThemeColors();
@@ -29,19 +32,23 @@ export const AppTextInput = React.memo(function AppTextInput({
           {label}
         </Text>
       )}
-      <TextInput
+      <View
         style={[
-          styles.input,
+          styles.inputWrapper,
           {
             backgroundColor: colors.backgroundTertiary,
-            color: colors.textOnSurface,
             borderColor: hasError ? colors.danger : colors.border,
           },
         ]}
-        placeholderTextColor={colors.textTertiary}
-        autoCorrect={false}
-        {...inputProps}
-      />
+      >
+        <TextInput
+          style={[styles.input, { color: colors.textOnSurface }]}
+          placeholderTextColor={colors.textTertiary}
+          autoCorrect={false}
+          {...inputProps}
+        />
+        {rightElement}
+      </View>
     </View>
   );
 });
@@ -54,11 +61,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  input: {
+  inputWrapper: {
     height: 50,
     borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  input: {
+    flex: 1,
     paddingHorizontal: 16,
     fontSize: 16,
-    borderWidth: 1,
   },
 });

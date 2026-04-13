@@ -2,7 +2,7 @@ import { NotificationButton } from '@/shared/presentation/components/notificatio
 import { ThemeToggle } from '@/shared/presentation/components/theme-toggle';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ExchangeRateBanner } from '../components/exchange-rate-banner';
 import { FinanceOverview } from '../components/finance-overview';
@@ -70,11 +70,10 @@ export default function HomeScreen() {
       </View>
 
       {/* Content — fondo blanco, sube sobre el header */}
-      <View
-        style={[
-          styles.contentSection,
-          { backgroundColor: colors.backgroundSecondary },
-        ]}
+      <ScrollView
+        style={[styles.contentSection, { backgroundColor: colors.backgroundSecondary }]}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
       >
         {/* Quick Actions */}
         <QuickActions />
@@ -105,7 +104,7 @@ export default function HomeScreen() {
 
         {/* Guest CTA */}
         {!summary.isAuthenticated && <GuestCtaCard />}
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -158,11 +157,13 @@ const styles = StyleSheet.create({
   },
   contentSection: {
     flex: 1,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+  },
+  contentContainer: {
     paddingHorizontal: 20,
     paddingTop: 20,
     paddingBottom: 24,
     gap: 24,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
   },
 });
