@@ -37,6 +37,8 @@ interface AuthState {
   setSession: (session: AuthSession) => void;
   /** Actualiza solo los tokens (tras refresh) */
   updateTokens: (tokens: AuthTokens) => void;
+  /** Actualiza los datos del usuario en store y persistencia */
+  updateUser: (user: Partial<AuthUser>) => void;
   /** Limpia toda la sesión (logout) */
   clearSession: () => void;
   /** Marca que la restauración terminó */
@@ -88,6 +90,25 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       // Defer para que el state se haya propagado a los subscribers
       queueMicrotask(pendingAction);
     }
+  },
+
+  updateUser: (updates: Partial<AuthUser>) => {
+    const state = get();
+    const updatedUser = state.user ? { ...state.user, ...updates } : null;
+
+    set({ user: updatedUser });
+
+    const persistedSession: PersistedAuthSession = {
+      isAuthenticated: state.isAuthenticated,
+      user: updatedUser,
+      accessToken: state.accessToken,
+      refreshToken: state.refreshToken,
+    };
+
+    void secureStorage.setItem(
+      AUTH_SESSION_KEY,
+      JSON.stringify(persistedSession),
+    );
   },
 
   updateTokens: (tokens: AuthTokens) => {

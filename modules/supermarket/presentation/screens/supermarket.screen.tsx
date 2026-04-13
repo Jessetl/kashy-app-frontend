@@ -14,6 +14,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  Share,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -260,6 +261,60 @@ export default function SupermarketScreen() {
     );
   }, [activeList, deleteList, createList]);
 
+  const handleShare = useCallback(async () => {
+    if (!activeList || activeList.items.length === 0) return;
+
+    const CATEGORY_LABELS: Record<string, string> = {
+      COMIDA: '🍽 Comida',
+      FRUTAS: '🍎 Frutas',
+      CARNES: '🥩 Carnes',
+      BEBIDAS: '🥤 Bebidas',
+      LIMPIEZA: '🧹 Limpieza',
+      HIGIENE: '🚿 Higiene',
+      OTROS: '📦 Otros',
+    };
+
+    const fmtBs  = (n: number) => `Bs ${n.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const fmtUsd = (n: number) => `$${n.toFixed(2)}`;
+
+    const lines: string[] = [];
+
+    lines.push(`🛒 ${activeList.name}`);
+    if (activeList.storeName) lines.push(`📍 ${activeList.storeName}`);
+    lines.push('');
+
+    // Agrupar por categoría
+    const groups: Record<string, typeof activeList.items> = {};
+    for (const item of activeList.items) {
+      if (!groups[item.category]) groups[item.category] = [];
+      groups[item.category].push(item);
+    }
+
+    lines.push('PRODUCTOS:');
+    for (const [cat, items] of Object.entries(groups)) {
+      lines.push('');
+      lines.push(CATEGORY_LABELS[cat] ?? cat);
+      for (const item of items) {
+        const check = item.isPurchased ? '✅' : '▪';
+        const usd   = item.totalUsd != null ? ` (${fmtUsd(item.totalUsd)})` : '';
+        lines.push(`  ${check} ${item.productName} x${item.quantity} — ${fmtBs(item.totalLocal)}${usd}`);
+      }
+    }
+
+    lines.push('');
+    lines.push('─────────────────────');
+    lines.push(`💵 Total: ${fmtBs(activeList.totalLocal)} | ${fmtUsd(activeList.totalUsd)}`);
+    if (activeList.ivaEnabled) lines.push('   (IVA incluido)');
+    lines.push('');
+    lines.push('Compartido desde Kashy 💚');
+
+    try {
+      await Share.share({ message: lines.join('\n'), title: activeList.name });
+    } catch {
+      // usuario canceló
+    }
+  }, [activeList]);
+
   const handleNewList = useCallback(() => {
     if (activeList && activeList.items.length > 0) {
       Alert.alert(
@@ -301,7 +356,11 @@ export default function SupermarketScreen() {
     >
       <View style={[styles.flex, { paddingTop: insets.top }]}>
         <ListHeaderBar
-          onShare={() => {}}
+          onShare={
+            activeList && !activeList.id.startsWith('local-') && activeList.items.length > 0
+              ? () => { void handleShare(); }
+              : undefined
+          }
           onSave={handleSave}
           onOpenSavedLists={handleOpenSavedLists}
           onDelete={handleDeleteList}
