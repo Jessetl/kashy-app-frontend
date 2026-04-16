@@ -5,7 +5,7 @@ import {
   useThemeActions,
   useThemeColor,
 } from '@/shared/presentation/hooks/use-app-theme';
-import * as Haptics from 'expo-haptics';
+import { triggerLightImpactHaptic } from '@/shared/presentation/utils/haptics';
 import { Moon, Sun } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { StyleSheet } from 'react-native';
@@ -56,11 +56,9 @@ export const ThemeToggle = React.memo(function ThemeToggle() {
     toggleTheme();
 
     // Haptic feedback sutil al cambiar tema
-    if (process.env.EXPO_OS === 'ios') {
-      requestAnimationFrame(() => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      });
-    }
+    requestAnimationFrame(() => {
+      void triggerLightImpactHaptic();
+    });
   }, [isDark, toggleTheme, rotation]);
 
   const animatedIconStyle = useAnimatedStyle(() => ({

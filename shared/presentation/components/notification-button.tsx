@@ -1,6 +1,6 @@
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColor } from '@/shared/presentation/hooks/use-app-theme';
-import * as Haptics from 'expo-haptics';
+import { triggerLightImpactHaptic } from '@/shared/presentation/utils/haptics';
 import { Bell } from 'lucide-react-native';
 import React, { useCallback } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -22,9 +22,7 @@ export const NotificationButton = React.memo(function NotificationButton({
   const danger = useThemeColor('danger');
 
   const handlePress = useCallback(() => {
-    if (process.env.EXPO_OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    void triggerLightImpactHaptic();
     onPress?.();
   }, [onPress]);
 

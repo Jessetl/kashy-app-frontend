@@ -54,7 +54,7 @@ export const AddProductForm = React.memo(function AddProductForm({
       return;
     }
 
-    onAdd(trimmedName, localPrice);
+    onAdd(trimmedName, parseFloat(localPrice.toFixed(2)));
     setProductName('');
     setPrice('');
   }, [productName, price, priceInLocal, usdToLocal, onAdd]);

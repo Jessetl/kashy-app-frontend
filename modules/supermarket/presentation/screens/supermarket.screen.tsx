@@ -4,13 +4,7 @@ import { BottomSheetModal } from '@/shared/presentation/components/ui/bottom-she
 import { DialogModal } from '@/shared/presentation/components/ui/dialog-modal';
 import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -73,24 +67,11 @@ export default function SupermarketScreen() {
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
   const [priceInLocal, setPriceInLocal] = useState(false);
 
-  const didInit = useRef(false);
-
   useEffect(() => {
-    if (didInit.current) {
-      return;
+    if (isAuthenticated && !activeList) {
+      void createList('Nueva lista');
     }
-    didInit.current = true;
-
-    void (async () => {
-      await loadLists();
-      const state = useShoppingListStore.getState();
-      if (state.lists.length === 0 && !state.activeList) {
-        await createList('Nueva lista');
-      } else if (!state.activeList && state.lists.length > 0) {
-        state.setActiveList(state.lists[0]);
-      }
-    })();
-  }, [loadLists, createList]);
+  }, [isAuthenticated, createList, activeList]);
 
   // Set exchange rate in the store so totals recalculate properly
   useEffect(() => {
@@ -129,7 +110,9 @@ export default function SupermarketScreen() {
     const groups: Record<string, ShoppingItem[]> = {};
     for (const item of items) {
       const cat = item.category || 'otros';
-      if (!groups[cat]) groups[cat] = [];
+      if (!groups[cat]) {
+        groups[cat] = [];
+      }
       groups[cat].push(item);
     }
     return Object.entries(groups);

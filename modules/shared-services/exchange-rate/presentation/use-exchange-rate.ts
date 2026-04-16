@@ -29,7 +29,9 @@ export function useExchangeRate() {
 
   const localToUsd = useCallback(
     (local: number): number => {
-      if (!rate || rate.rateLocalPerUsd <= 0) return 0;
+      if (!rate || rate.rateLocalPerUsd <= 0) {
+        return 0;
+      }
       return local / rate.rateLocalPerUsd;
     },
     [rate],
@@ -37,7 +39,9 @@ export function useExchangeRate() {
 
   const usdToLocal = useCallback(
     (usd: number): number => {
-      if (!rate) return 0;
+      if (!rate) {
+        return 0;
+      }
       return usd * rate.rateLocalPerUsd;
     },
     [rate],

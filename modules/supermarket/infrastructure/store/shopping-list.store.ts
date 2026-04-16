@@ -158,6 +158,7 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
       if (syncToApi) {
         // Server list — sync item to BD
         const item = await datasource.addItem(activeList.id, input);
+
         set((state) => {
           if (!state.activeList) {
             return state;
@@ -284,7 +285,9 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
         };
       });
 
-      if (shouldPersistToStorage()) get().persistGuestData();
+      if (shouldPersistToStorage()) {
+        get().persistGuestData();
+      }
     } catch (err) {
       let message = 'No se pudo actualizar la cantidad';
       if (err instanceof Error) {

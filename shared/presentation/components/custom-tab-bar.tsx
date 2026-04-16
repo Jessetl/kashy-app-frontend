@@ -1,7 +1,7 @@
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
+import { triggerLightImpactHaptic } from '@/shared/presentation/utils/haptics';
 import { type BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import * as Haptics from 'expo-haptics';
 import React, { useCallback } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import Animated, {
@@ -48,9 +48,7 @@ const TabItem = React.memo(function TabItem({
   return (
     <AppPressable
       onPress={() => {
-        if (Platform.OS === 'ios') {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-        }
+        void triggerLightImpactHaptic();
         onPress();
       }}
       onLongPress={onLongPress}
@@ -82,7 +80,7 @@ export function CustomTabBar({
 }: BottomTabBarProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-  console.log('Safe area insets:', insets);
+
   return (
     <View
       style={[

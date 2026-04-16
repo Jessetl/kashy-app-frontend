@@ -12,10 +12,10 @@ function mapItemToApi(
 ) {
   return {
     productName: input.productName,
-    unitPriceLocal: input.unitPriceLocal,
     quantity: input.quantity,
     category: input.category,
-    unitPriceUsd: input.unitPriceUsd ?? null,
+    unitPriceLocal: parseFloat(input.unitPriceLocal.toFixed(2)),
+    unitPriceUsd: parseFloat((input.unitPriceUsd || 0)?.toFixed(2)),
     ...(input.isPurchased !== undefined && { isPurchased: input.isPurchased }),
   };
 }
@@ -106,8 +106,8 @@ export class ShoppingListDatasource implements ShoppingListPort {
         body: {
           productName: data.productName,
           category: data.category,
-          unitPriceLocal: data.unitPriceLocal,
           quantity: data.quantity,
+          unitPriceLocal: data.unitPriceLocal,
           unitPriceUsd: data.unitPriceUsd,
         },
       },

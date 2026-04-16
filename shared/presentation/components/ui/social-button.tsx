@@ -1,8 +1,8 @@
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
-import * as Haptics from 'expo-haptics';
+import { triggerLightImpactHaptic } from '@/shared/presentation/utils/haptics';
 import React, { useCallback } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text } from 'react-native';
 
 interface SocialButtonProps {
   /** Nombre del provider (Google, Apple…) */
@@ -27,9 +27,7 @@ export const SocialButton = React.memo(function SocialButton({
   const colors = useThemeColors();
 
   const handlePress = useCallback(() => {
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    void triggerLightImpactHaptic();
     onPress();
   }, [onPress]);
 
@@ -49,7 +47,9 @@ export const SocialButton = React.memo(function SocialButton({
       {loading ? (
         <ActivityIndicator size='small' color={colors.textOnSurface} />
       ) : (
-        <Text style={[styles.icon, { color: iconColor ?? colors.textOnSurface }]}>
+        <Text
+          style={[styles.icon, { color: iconColor ?? colors.textOnSurface }]}
+        >
           {icon}
         </Text>
       )}
