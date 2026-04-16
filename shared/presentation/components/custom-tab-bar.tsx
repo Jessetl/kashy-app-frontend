@@ -4,12 +4,12 @@ import { type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import * as Haptics from 'expo-haptics';
 import React, { useCallback } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const TAB_ICON_SIZE = 44;
 const TAB_BAR_HEIGHT = 64;
@@ -82,7 +82,7 @@ export function CustomTabBar({
 }: BottomTabBarProps) {
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
-
+  console.log('Safe area insets:', insets);
   return (
     <View
       style={[

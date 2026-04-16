@@ -5,8 +5,8 @@ import { useCountryStore } from '@/shared/infrastructure/country/country.store';
 import { useLocationStore } from '@/shared/infrastructure/location/location.store';
 import { AppThemeProvider } from '@/shared/infrastructure/theme';
 import { usePushNotifications } from '@/shared/presentation/hooks/use-push-notifications';
-import * as WebBrowser from 'expo-web-browser';
 import { Stack } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useEffect } from 'react';
 import { StyleSheet } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -31,12 +31,14 @@ function AppContent() {
 
   // Solicitar permisos de localización al iniciar la app
   const requestLocation = useLocationStore((s) => s.requestLocation);
+
   useEffect(() => {
     requestLocation();
   }, [requestLocation]);
 
   // Restaurar país seleccionado desde storage
   const hydrateCountry = useCountryStore((s) => s.hydrateCountry);
+
   useEffect(() => {
     void hydrateCountry();
   }, [hydrateCountry]);

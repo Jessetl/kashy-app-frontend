@@ -1,11 +1,14 @@
 import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
-import { formatLocalAmount, formatUsdAmount } from '@/shared/presentation/utils/format-currency';
 import {
   AppPressable,
   BottomSheetModal,
 } from '@/shared/presentation/components/ui';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { useCountry } from '@/shared/presentation/hooks/use-country';
+import {
+  formatLocalAmount,
+  formatUsdAmount,
+} from '@/shared/presentation/utils/format-currency';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
   AlertCircle,

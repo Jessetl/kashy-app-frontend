@@ -2,7 +2,10 @@ import type { CountryConfig } from '@/shared/infrastructure/country/country.cons
 
 const cache = new Map<string, Intl.NumberFormat>();
 
-function getCachedFormatter(locale: string, decimals: number): Intl.NumberFormat {
+function getCachedFormatter(
+  locale: string,
+  decimals: number,
+): Intl.NumberFormat {
   const key = `${locale}:${decimals}`;
   let fmt = cache.get(key);
   if (!fmt) {
@@ -16,7 +19,10 @@ function getCachedFormatter(locale: string, decimals: number): Intl.NumberFormat
 }
 
 /** "Bs. 1.234,56"  —  local currency with country locale */
-export function formatLocalAmount(amount: number, country: CountryConfig): string {
+export function formatLocalAmount(
+  amount: number,
+  country: CountryConfig,
+): string {
   return `${country.currency} ${getCachedFormatter(country.locale, 2).format(amount)}`;
 }
 

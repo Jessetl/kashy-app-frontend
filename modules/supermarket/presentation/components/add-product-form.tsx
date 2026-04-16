@@ -1,5 +1,5 @@
-import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
+import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
 import { useCountry } from '@/shared/presentation/hooks/use-country';
 import { Check, Plus, X } from 'lucide-react-native';
@@ -50,7 +50,9 @@ export const AddProductForm = React.memo(function AddProductForm({
 
     const localPrice = priceInLocal ? numPrice : usdToLocal(numPrice);
 
-    if (localPrice <= 0) return;
+    if (localPrice <= 0) {
+      return;
+    }
 
     onAdd(trimmedName, localPrice);
     setProductName('');

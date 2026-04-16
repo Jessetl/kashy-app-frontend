@@ -4,8 +4,6 @@ import { BottomSheetModal } from '@/shared/presentation/components/ui/bottom-she
 import { DialogModal } from '@/shared/presentation/components/ui/dialog-modal';
 import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
-import { useCountry } from '@/shared/presentation/hooks/use-country';
-import { formatLocalAmount, formatUsdAmount } from '@/shared/presentation/utils/format-currency';
 import React, {
   useCallback,
   useEffect,
@@ -17,7 +15,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  Share,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -41,12 +38,12 @@ import { SaveListForm } from '../components/save-list-form';
 import { SavedListsSheet } from '../components/saved-lists-sheet';
 import { SummaryCards } from '../components/summary-cards';
 import { ViewToggle, type ViewMode } from '../components/view-toggle';
+import { useShareShoppingList } from '../hooks/use-share-shopping-list';
 
 const LIST_HEADER_BAR_HEIGHT = 48;
 
 export default function SupermarketScreen() {
   const { colors } = useAppTheme();
-  const { country } = useCountry();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const { isAuthenticated, openLoginModal } = useAuth();
@@ -79,7 +76,9 @@ export default function SupermarketScreen() {
   const didInit = useRef(false);
 
   useEffect(() => {
-    if (didInit.current) return;
+    if (didInit.current) {
+      return;
+    }
     didInit.current = true;
 
     void (async () => {
@@ -92,12 +91,6 @@ export default function SupermarketScreen() {
       }
     })();
   }, [loadLists, createList]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      void useShoppingListStore.getState().syncGuestData();
-    }
-  }, [isAuthenticated]);
 
   // Set exchange rate in the store so totals recalculate properly
   useEffect(() => {
@@ -270,60 +263,7 @@ export default function SupermarketScreen() {
     );
   }, [activeList, deleteList, createList]);
 
-  const handleShare = useCallback(async () => {
-    if (!activeList || activeList.items.length === 0) return;
-
-    const CATEGORY_LABELS: Record<string, string> = {
-      COMIDA: '🍽 Comida',
-      VIVERES: '🧺 Víveres',
-      FRUTAS: '🍎 Frutas',
-      CARNES: '🥩 Carnes',
-      BEBIDAS: '🥤 Bebidas',
-      LIMPIEZA: '🧹 Limpieza',
-      HIGIENE: '🚿 Higiene',
-      OTROS: '📦 Otros',
-    };
-
-    const fmtBs  = (n: number) => formatLocalAmount(n, country);
-    const fmtUsd = (n: number) => formatUsdAmount(n);
-
-    const lines: string[] = [];
-
-    lines.push(`🛒 ${activeList.name}`);
-    if (activeList.storeName) lines.push(`📍 ${activeList.storeName}`);
-    lines.push('');
-
-    // Agrupar por categoría
-    const groups: Record<string, typeof activeList.items> = {};
-    for (const item of activeList.items) {
-      if (!groups[item.category]) groups[item.category] = [];
-      groups[item.category].push(item);
-    }
-
-    lines.push('PRODUCTOS:');
-    for (const [cat, items] of Object.entries(groups)) {
-      lines.push('');
-      lines.push(CATEGORY_LABELS[cat] ?? cat);
-      for (const item of items) {
-        const check = item.isPurchased ? '✅' : '▪';
-        const usd   = item.totalUsd != null ? ` (${fmtUsd(item.totalUsd)})` : '';
-        lines.push(`  ${check} ${item.productName} x${item.quantity} — ${fmtBs(item.totalLocal)}${usd}`);
-      }
-    }
-
-    lines.push('');
-    lines.push('─────────────────────');
-    lines.push(`💵 Total: ${fmtBs(activeList.totalLocal)} | ${fmtUsd(activeList.totalUsd)}`);
-    if (activeList.ivaEnabled) lines.push('   (IVA incluido)');
-    lines.push('');
-    lines.push('Compartido desde Kashy 💚');
-
-    try {
-      await Share.share({ message: lines.join('\n'), title: activeList.name });
-    } catch {
-      // usuario canceló
-    }
-  }, [activeList]);
+  const { canShare, handleShare } = useShareShoppingList({ activeList });
 
   const handleNewList = useCallback(() => {
     if (activeList && activeList.items.length > 0) {
@@ -367,11 +307,7 @@ export default function SupermarketScreen() {
     >
       <View style={[styles.flex, { paddingTop: insets.top }]}>
         <ListHeaderBar
-          onShare={
-            activeList && !activeList.id.startsWith('local-') && activeList.items.length > 0
-              ? () => { void handleShare(); }
-              : undefined
-          }
+          onShare={canShare ? () => void handleShare() : undefined}
           onSave={handleSave}
           onOpenSavedLists={handleOpenSavedLists}
           onDelete={handleDeleteList}

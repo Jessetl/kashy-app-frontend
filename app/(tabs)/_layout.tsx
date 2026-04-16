@@ -1,12 +1,7 @@
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs } from 'expo-router';
-import {
-  Home,
-  ShoppingBag,
-  User,
-  Wallet,
-} from 'lucide-react-native';
+import { Home, ShoppingBag, User, Wallet } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 

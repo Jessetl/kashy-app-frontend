@@ -1,6 +1,6 @@
-import type { AuthUser } from '@/shared/domain/auth/auth.types';
 import { useDebtStore } from '@/modules/debts/infrastructure/store/debt.store';
 import { useShoppingListStore } from '@/modules/supermarket/infrastructure/store/shopping-list.store';
+import type { AuthUser } from '@/shared/domain/auth/auth.types';
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { useCallback } from 'react';
 
