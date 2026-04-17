@@ -9,7 +9,124 @@ import type {
 import { ShoppingListDatasource } from '../datasources/shopping-list.datasource';
 
 const GUEST_LISTS_KEY = 'guest-shopping-lists';
+const AUTH_LISTS_CACHE_KEY = 'auth-shopping-lists-cache';
 const datasource = new ShoppingListDatasource();
+
+const ITEM_SYNC_DEBOUNCE_MS = 600;
+const TOGGLE_SYNC_DEBOUNCE_MS = 400;
+
+type PendingItemSync = {
+  timeout: ReturnType<typeof setTimeout>;
+  listId: string;
+  data: Partial<CreateShoppingItemInput>;
+};
+
+const pendingItemSyncs = new Map<string, PendingItemSync>();
+const pendingToggleSyncs = new Map<
+  string,
+  { timeout: ReturnType<typeof setTimeout>; listId: string }
+>();
+
+const scheduleItemApiSync = (
+  listId: string,
+  itemId: string,
+  data: Partial<CreateShoppingItemInput>,
+  onError: (msg: string) => void,
+): void => {
+  const existing = pendingItemSyncs.get(itemId);
+  const mergedData: Partial<CreateShoppingItemInput> = existing
+    ? { ...existing.data, ...data }
+    : { ...data };
+
+  if (existing) {
+    clearTimeout(existing.timeout);
+  }
+
+  const timeout = setTimeout(() => {
+    const pending = pendingItemSyncs.get(itemId);
+    pendingItemSyncs.delete(itemId);
+    const payload = pending?.data ?? mergedData;
+    void datasource.updateItem(listId, itemId, payload).catch((err) => {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'No se pudo sincronizar el producto';
+      onError(message);
+    });
+  }, ITEM_SYNC_DEBOUNCE_MS);
+
+  pendingItemSyncs.set(itemId, { timeout, listId, data: mergedData });
+};
+
+/**
+ * Schedules a toggle sync. If there's already a pending toggle for this item,
+ * we cancel it (user toggled back — net effect is no change on the server).
+ */
+const scheduleToggleApiSync = (
+  listId: string,
+  itemId: string,
+  onError: (msg: string) => void,
+): void => {
+  const existing = pendingToggleSyncs.get(itemId);
+  if (existing) {
+    clearTimeout(existing.timeout);
+    pendingToggleSyncs.delete(itemId);
+    return;
+  }
+
+  const timeout = setTimeout(() => {
+    pendingToggleSyncs.delete(itemId);
+    void datasource.toggleItemPurchased(listId, itemId).catch((err) => {
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'No se pudo actualizar el producto';
+      onError(message);
+    });
+  }, TOGGLE_SYNC_DEBOUNCE_MS);
+
+  pendingToggleSyncs.set(itemId, { timeout, listId });
+};
+
+const flushPendingSyncs = async (
+  onError: (msg: string) => void,
+): Promise<void> => {
+  const itemEntries = Array.from(pendingItemSyncs.entries());
+  const toggleEntries = Array.from(pendingToggleSyncs.entries());
+
+  itemEntries.forEach(([, pending]) => clearTimeout(pending.timeout));
+  toggleEntries.forEach(([, pending]) => clearTimeout(pending.timeout));
+  pendingItemSyncs.clear();
+  pendingToggleSyncs.clear();
+
+  const tasks: Promise<unknown>[] = [];
+
+  for (const [itemId, pending] of itemEntries) {
+    tasks.push(
+      datasource.updateItem(pending.listId, itemId, pending.data).catch((err) => {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'No se pudo sincronizar el producto';
+        onError(message);
+      }),
+    );
+  }
+
+  for (const [itemId, pending] of toggleEntries) {
+    tasks.push(
+      datasource.toggleItemPurchased(pending.listId, itemId).catch((err) => {
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'No se pudo actualizar el producto';
+        onError(message);
+      }),
+    );
+  }
+
+  await Promise.all(tasks);
+};
 
 const generateId = (): string => {
   return `local-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
@@ -60,7 +177,9 @@ interface ShoppingListState {
   completeList: (listId: string) => Promise<void>;
   syncGuestData: () => Promise<void>;
   persistGuestData: () => void;
+  persistListsCache: () => void;
   hydrateGuestData: () => Promise<void>;
+  flushPendingItemSyncs: () => Promise<void>;
   clearError: () => void;
   resetStore: () => void;
 }
@@ -241,59 +360,56 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
       return;
     }
 
-    const syncToApi = shouldSyncToApi(activeList.id);
+    set({ error: null });
 
-    try {
-      set({ error: null });
-
-      if (syncToApi) {
-        await datasource.updateItem(activeList.id, itemId, { quantity });
+    // 1. Optimistic UI update — state first so the component re-renders instantly.
+    set((state) => {
+      if (!state.activeList) {
+        return state;
       }
 
-      set((state) => {
-        if (!state.activeList) {
-          return state;
-        }
-
-        const rate = state.activeList.exchangeRateSnapshot;
-        const updatedItems = state.activeList.items.map((item) => {
-          if (item.id !== itemId) return item;
-          const totalLocal = item.unitPriceLocal * quantity;
-          const unitPriceUsd =
-            rate && rate > 0 ? item.unitPriceLocal / rate : item.unitPriceUsd;
-          const totalUsd = rate && rate > 0 ? totalLocal / rate : item.totalUsd;
-          return { ...item, quantity, totalLocal, unitPriceUsd, totalUsd };
-        });
-
-        const totals = recalculateTotals(
-          updatedItems,
-          state.activeList.ivaEnabled,
-          state.activeList.exchangeRateSnapshot,
-        );
-
-        const updatedList = {
-          ...state.activeList,
-          items: updatedItems,
-          ...totals,
-        };
-
-        return {
-          activeList: updatedList,
-          lists: state.lists.map((l) =>
-            l.id === updatedList.id ? updatedList : l,
-          ),
-        };
+      const rate = state.activeList.exchangeRateSnapshot;
+      const updatedItems = state.activeList.items.map((item) => {
+        if (item.id !== itemId) return item;
+        const totalLocal = item.unitPriceLocal * quantity;
+        const unitPriceUsd =
+          rate && rate > 0 ? item.unitPriceLocal / rate : item.unitPriceUsd;
+        const totalUsd = rate && rate > 0 ? totalLocal / rate : item.totalUsd;
+        return { ...item, quantity, totalLocal, unitPriceUsd, totalUsd };
       });
 
-      if (shouldPersistToStorage()) {
-        get().persistGuestData();
-      }
-    } catch (err) {
-      let message = 'No se pudo actualizar la cantidad';
-      if (err instanceof Error) {
-        message = err.message;
-      }
-      set({ error: message });
+      const totals = recalculateTotals(
+        updatedItems,
+        state.activeList.ivaEnabled,
+        state.activeList.exchangeRateSnapshot,
+      );
+
+      const updatedList = {
+        ...state.activeList,
+        items: updatedItems,
+        ...totals,
+      };
+
+      return {
+        activeList: updatedList,
+        lists: state.lists.map((l) =>
+          l.id === updatedList.id ? updatedList : l,
+        ),
+      };
+    });
+
+    // 2. Persist to storage (guest lists + authenticated cache).
+    get().persistListsCache();
+
+    // 3. Debounce the API sync so rapid +/- clicks batch into one request
+    //    with the final quantity.
+    if (shouldSyncToApi(activeList.id)) {
+      scheduleItemApiSync(
+        activeList.id,
+        itemId,
+        { quantity },
+        (msg) => set({ error: msg }),
+      );
     }
   },
 
@@ -303,66 +419,68 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
       return;
     }
 
-    const syncToApi = shouldSyncToApi(activeList.id);
+    set({ error: null });
 
-    try {
-      set({ error: null });
-
-      if (syncToApi) {
-        await datasource.updateItem(activeList.id, itemId, data);
+    // 1. Optimistic UI update first.
+    set((state) => {
+      if (!state.activeList) {
+        return state;
       }
 
-      set((state) => {
-        if (!state.activeList) {
-          return state;
+      const rate = state.activeList.exchangeRateSnapshot;
+
+      const updatedItems = state.activeList.items.map((item) => {
+        if (item.id !== itemId) {
+          return item;
         }
 
-        const updatedItems = state.activeList.items.map((item) => {
-          if (item.id !== itemId) {
-            return item;
-          }
-
-          const updated = {
-            ...item,
-            productName: data.productName ?? item.productName,
-            unitPriceLocal: data.unitPriceLocal ?? item.unitPriceLocal,
-            quantity: data.quantity ?? item.quantity,
-            category: data.category ?? item.category,
-          };
-
-          updated.totalLocal = updated.unitPriceLocal * updated.quantity;
-          return updated;
-        });
-
-        const totals = recalculateTotals(
-          updatedItems,
-          state.activeList.ivaEnabled,
-          state.activeList.exchangeRateSnapshot,
-        );
-
-        const updatedList = {
-          ...state.activeList,
-          items: updatedItems,
-          ...totals,
+        const updated = {
+          ...item,
+          productName: data.productName ?? item.productName,
+          unitPriceLocal: data.unitPriceLocal ?? item.unitPriceLocal,
+          quantity: data.quantity ?? item.quantity,
+          category: data.category ?? item.category,
         };
 
-        return {
-          activeList: updatedList,
-          lists: state.lists.map((l) =>
-            l.id === updatedList.id ? updatedList : l,
-          ),
-        };
+        updated.totalLocal = updated.unitPriceLocal * updated.quantity;
+        if (rate && rate > 0) {
+          updated.unitPriceUsd = updated.unitPriceLocal / rate;
+          updated.totalUsd = updated.totalLocal / rate;
+        }
+        return updated;
       });
 
-      if (shouldPersistToStorage()) {
-        get().persistGuestData();
-      }
-    } catch (err) {
-      let message = 'No se pudo actualizar el producto';
-      if (err instanceof Error) {
-        message = err.message;
-      }
-      set({ error: message });
+      const totals = recalculateTotals(
+        updatedItems,
+        state.activeList.ivaEnabled,
+        state.activeList.exchangeRateSnapshot,
+      );
+
+      const updatedList = {
+        ...state.activeList,
+        items: updatedItems,
+        ...totals,
+      };
+
+      return {
+        activeList: updatedList,
+        lists: state.lists.map((l) =>
+          l.id === updatedList.id ? updatedList : l,
+        ),
+      };
+    });
+
+    // 2. Persist to storage.
+    get().persistListsCache();
+
+    // 3. Debounce the API sync so rapid edits to price/name/qty coalesce.
+    if (shouldSyncToApi(activeList.id)) {
+      scheduleItemApiSync(
+        activeList.id,
+        itemId,
+        data,
+        (msg) => set({ error: msg }),
+      );
     }
   },
 
@@ -373,6 +491,19 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
     }
 
     const syncToApi = shouldSyncToApi(activeList.id);
+
+    // Cancel any pending debounced syncs for this item — no point trying to
+    // update an item that's about to be deleted on the server.
+    const pendingItem = pendingItemSyncs.get(itemId);
+    if (pendingItem) {
+      clearTimeout(pendingItem.timeout);
+      pendingItemSyncs.delete(itemId);
+    }
+    const pendingToggle = pendingToggleSyncs.get(itemId);
+    if (pendingToggle) {
+      clearTimeout(pendingToggle.timeout);
+      pendingToggleSyncs.delete(itemId);
+    }
 
     try {
       set({ error: null });
@@ -426,40 +557,33 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
     const { activeList } = get();
     if (!activeList) return;
 
-    const syncToApi = shouldSyncToApi(activeList.id);
+    set({ error: null });
 
-    try {
-      set({ error: null });
+    // 1. Optimistic UI update first.
+    set((state) => {
+      if (!state.activeList) return state;
+      const updatedItems = state.activeList.items.map((item) =>
+        item.id === itemId
+          ? { ...item, isPurchased: !item.isPurchased }
+          : item,
+      );
+      const updatedList = { ...state.activeList, items: updatedItems };
+      return {
+        activeList: updatedList,
+        lists: state.lists.map((l) =>
+          l.id === updatedList.id ? updatedList : l,
+        ),
+      };
+    });
 
-      if (syncToApi) {
-        await datasource.toggleItemPurchased(activeList.id, itemId);
-      }
+    // 2. Persist to storage.
+    get().persistListsCache();
 
-      set((state) => {
-        if (!state.activeList) return state;
-        const updatedItems = state.activeList.items.map((item) =>
-          item.id === itemId
-            ? { ...item, isPurchased: !item.isPurchased }
-            : item,
-        );
-        const updatedList = { ...state.activeList, items: updatedItems };
-        return {
-          activeList: updatedList,
-          lists: state.lists.map((l) =>
-            l.id === updatedList.id ? updatedList : l,
-          ),
-        };
-      });
-
-      if (shouldPersistToStorage()) {
-        get().persistGuestData();
-      }
-    } catch (err) {
-      let message = 'No se pudo actualizar el producto';
-      if (err instanceof Error) {
-        message = err.message;
-      }
-      set({ error: message });
+    // 3. Debounced toggle sync — rapid toggles cancel each other.
+    if (shouldSyncToApi(activeList.id)) {
+      scheduleToggleApiSync(activeList.id, itemId, (msg) =>
+        set({ error: msg }),
+      );
     }
   },
 
@@ -634,6 +758,31 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
     // Only persist local lists — server lists belong to the BD
     const localLists = lists.filter((l) => !isServerList(l.id));
     void secureStorage.setItem(GUEST_LISTS_KEY, JSON.stringify(localLists));
+  },
+
+  /**
+   * Persists everything relevant: guest lists + (when authenticated) a cache
+   * of server lists so the UI can hydrate instantly on next launch while the
+   * real data is refetched in the background.
+   */
+  persistListsCache: () => {
+    const { lists } = get();
+    const { isAuthenticated } = useAuthStore.getState();
+
+    const localLists = lists.filter((l) => !isServerList(l.id));
+    void secureStorage.setItem(GUEST_LISTS_KEY, JSON.stringify(localLists));
+
+    if (isAuthenticated) {
+      const serverLists = lists.filter((l) => isServerList(l.id));
+      void secureStorage.setItem(
+        AUTH_LISTS_CACHE_KEY,
+        JSON.stringify(serverLists),
+      );
+    }
+  },
+
+  flushPendingItemSyncs: async () => {
+    await flushPendingSyncs((msg) => set({ error: msg }));
   },
 
   hydrateGuestData: async () => {

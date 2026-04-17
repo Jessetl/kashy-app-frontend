@@ -111,6 +111,8 @@ export const DebtForm = React.memo(function DebtForm({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps='handled'
+        keyboardDismissMode='on-drag'
+        nestedScrollEnabled
       >
         {/* ─── Header ─── */}
         <View style={styles.headerSection}>

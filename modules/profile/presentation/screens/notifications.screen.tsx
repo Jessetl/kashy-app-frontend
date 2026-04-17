@@ -1,7 +1,7 @@
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
-import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
+import { useRouter } from 'expo-router';
 import {
   ArrowLeft,
   Bell,
@@ -186,10 +186,7 @@ export default function NotificationsScreen() {
               <ShieldAlert size={20} color={colors.danger} />
               <View style={nStyles.permissionTextCol}>
                 <Text
-                  style={[
-                    nStyles.permissionTitle,
-                    { color: colors.danger },
-                  ]}
+                  style={[nStyles.permissionTitle, { color: colors.danger }]}
                 >
                   Notificaciones bloqueadas
                 </Text>
@@ -245,10 +242,7 @@ export default function NotificationsScreen() {
             >
               <Info size={16} color={colors.warning} />
               <Text
-                style={[
-                  nStyles.disabledNoticeText,
-                  { color: colors.warning },
-                ]}
+                style={[nStyles.disabledNoticeText, { color: colors.warning }]}
               >
                 Activa las notificaciones push para configurar las categorías
               </Text>
@@ -278,10 +272,7 @@ export default function NotificationsScreen() {
                 colors={colors}
               />
               <View
-                style={[
-                  nStyles.separator,
-                  { backgroundColor: colors.border },
-                ]}
+                style={[nStyles.separator, { backgroundColor: colors.border }]}
               />
               <NotifToggle
                 icon={<TrendingUp size={18} color={colors.primary} />}
@@ -293,10 +284,7 @@ export default function NotificationsScreen() {
                 colors={colors}
               />
               <View
-                style={[
-                  nStyles.separator,
-                  { backgroundColor: colors.border },
-                ]}
+                style={[nStyles.separator, { backgroundColor: colors.border }]}
               />
               <NotifToggle
                 icon={<ShoppingBag size={18} color={colors.primary} />}

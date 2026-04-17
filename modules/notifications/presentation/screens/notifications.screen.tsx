@@ -1,3 +1,4 @@
+import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, BellOff, CheckCheck } from 'lucide-react-native';
@@ -10,16 +11,19 @@ import {
   type ListRenderItem,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import type { AppNotification } from '../../domain/entities/notification.entity';
 import { useNotificationStore } from '../../infrastructure/store/notification.store';
 import { NotificationItem } from '../components/notification-item';
 import { useNotifications } from '../hooks/use-notifications';
 
 export default function NotificationsScreen() {
-  const { colors } = useAppTheme();
+  const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
+  // In light mode the header sits over a colored/gradient backdrop that makes
+  // the default dark text unreadable — force white for title and back arrow.
+  const headerForegroundColor = isDark ? colors.textOnSurface : '#FFFFFF';
 
   const {
     notifications,
@@ -84,10 +88,15 @@ export default function NotificationsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <AppPressable onPress={handleBack} style={styles.backButton}>
-          <ArrowLeft size={22} color={colors.textOnSurface} strokeWidth={2} />
+          <ArrowLeft
+            pointerEvents='none'
+            size={22}
+            color={headerForegroundColor}
+            strokeWidth={2}
+          />
         </AppPressable>
         <View style={styles.headerTextContainer}>
-          <Text style={[styles.title, { color: colors.textOnSurface }]}>
+          <Text style={[styles.title, { color: headerForegroundColor }]}>
             Notificaciones
           </Text>
           {unreadCount > 0 && (
@@ -116,9 +125,7 @@ export default function NotificationsScreen() {
           notifications.length === 0 && styles.emptyContentContainer,
         ]}
         ItemSeparatorComponent={ItemSeparator}
-        ListEmptyComponent={
-          <EmptyState isAuthenticated={isAuthenticated} />
-        }
+        ListEmptyComponent={<EmptyState isAuthenticated={isAuthenticated} />}
         showsVerticalScrollIndicator={false}
       />
     </View>

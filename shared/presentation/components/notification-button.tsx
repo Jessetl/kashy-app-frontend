@@ -37,7 +37,12 @@ export const NotificationButton = React.memo(function NotificationButton({
           : 'Notificaciones'
       }
     >
-      <Bell size={ICON_SIZE} color={text} strokeWidth={2} />
+      <Bell
+        pointerEvents='none'
+        size={ICON_SIZE}
+        color={text}
+        strokeWidth={2}
+      />
       {badgeCount > 0 && (
         <View style={[styles.badge, { backgroundColor: danger }]} />
       )}

@@ -23,22 +23,49 @@ export const AddProductForm = React.memo(function AddProductForm({
 }: AddProductFormProps) {
   const colors = useThemeColors();
   const { country } = useCountry();
-  const { usdToLocal } = useExchangeRate();
+  const { usdToLocal, localToUsd } = useExchangeRate();
   const [productName, setProductName] = useState(initialName ?? '');
   const [price, setPrice] = useState(initialPrice ?? '');
   const priceRef = useRef<TextInput>(null);
 
   const isEditing = initialName != null;
+  const prevPriceInLocalRef = useRef(priceInLocal);
 
   useEffect(() => {
     setProductName(initialName ?? '');
     setPrice(initialPrice ?? '');
   }, [initialName, initialPrice]);
 
-  // Clear price when currency mode changes
+  // When the currency toggle changes:
+  // - If editing: convert the currently-entered value to the new currency so
+  //   the user sees the equivalent price and doesn't lose their edit.
+  // - If adding: clear the field (empty entry means nothing to convert).
   useEffect(() => {
-    setPrice('');
-  }, [priceInLocal]);
+    if (prevPriceInLocalRef.current === priceInLocal) {
+      return;
+    }
+    const wasLocal = prevPriceInLocalRef.current;
+    prevPriceInLocalRef.current = priceInLocal;
+
+    if (!isEditing) {
+      setPrice('');
+      return;
+    }
+
+    setPrice((current) => {
+      const numeric = parseFloat(current.replace(',', '.'));
+      if (!Number.isFinite(numeric) || numeric <= 0) {
+        return '';
+      }
+      // wasLocal=true & now USD → convert local→USD
+      // wasLocal=false & now local → convert USD→local
+      const converted = wasLocal ? localToUsd(numeric) : usdToLocal(numeric);
+      if (!Number.isFinite(converted) || converted <= 0) {
+        return current;
+      }
+      return converted.toFixed(2);
+    });
+  }, [priceInLocal, isEditing, localToUsd, usdToLocal]);
 
   const handleAdd = useCallback(() => {
     const trimmedName = productName.trim();

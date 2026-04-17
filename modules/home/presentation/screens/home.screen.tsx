@@ -78,7 +78,10 @@ export default function HomeScreen() {
 
       {/* Content — fondo blanco, sube sobre el header */}
       <ScrollView
-        style={[styles.contentSection, { backgroundColor: colors.backgroundSecondary }]}
+        style={[
+          styles.contentSection,
+          { backgroundColor: colors.backgroundSecondary },
+        ]}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
       >

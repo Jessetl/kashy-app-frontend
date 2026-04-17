@@ -1,5 +1,5 @@
 import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
-import { ParallaxScrollView } from '@/shared/presentation/components/parallax-scroll-view';
+import { FadeHeaderScrollView } from '@/shared/presentation/components/fade-header-scroll-view';
 import { BottomSheetModal } from '@/shared/presentation/components/ui/bottom-sheet-modal';
 import { DialogModal } from '@/shared/presentation/components/ui/dialog-modal';
 import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
@@ -171,6 +171,21 @@ export default function SupermarketScreen() {
     setPriceInLocal((prev) => !prev);
   }, []);
 
+  // When editing, the initial price must match the checkbox: stored as local,
+  // converted to USD on demand when the toggle is in USD mode.
+  const editingInitialPrice = useMemo(() => {
+    if (!editingItem) return undefined;
+    const localPrice = editingItem.unitPriceLocal;
+    if (priceInLocal) {
+      return localPrice.toString();
+    }
+    const usdPrice = localToUsd(localPrice);
+    if (!usdPrice || !Number.isFinite(usdPrice) || usdPrice <= 0) {
+      return localPrice.toString();
+    }
+    return usdPrice.toFixed(2);
+  }, [editingItem, priceInLocal, localToUsd]);
+
   const handleSave = useCallback(() => {
     if (!isAuthenticated) {
       openLoginModal(() => setShowSaveModal(true));
@@ -266,17 +281,6 @@ export default function SupermarketScreen() {
     }
   }, [activeList, createList]);
 
-  const parallaxIntensity = useMemo(
-    () => ({
-      stickyDistance: Math.max(104, Math.min(196, windowHeight * 0.24)),
-      followAfterSticky: 0.86,
-      liftMax: 72,
-      liftRange: 220,
-      pullDownScale: 1.035,
-    }),
-    [windowHeight],
-  );
-
   const listViewportMinHeight = useMemo(
     () => Math.max(0, windowHeight - insets.top - LIST_HEADER_BAR_HEIGHT),
     [windowHeight, insets.top],
@@ -295,17 +299,9 @@ export default function SupermarketScreen() {
           onOpenSavedLists={handleOpenSavedLists}
           onDelete={handleDeleteList}
         />
-        <ParallaxScrollView
-          intensity={parallaxIntensity}
+        <FadeHeaderScrollView
           contentContainerStyle={styles.scrollContent}
           headerStyle={styles.headerContainer}
-          contentStyle={[
-            styles.listSection,
-            {
-              backgroundColor: colors.backgroundSecondary,
-              minHeight: listViewportMinHeight,
-            },
-          ]}
           header={
             <View style={styles.headerContent}>
               <View style={styles.titleRow}>
@@ -336,32 +332,42 @@ export default function SupermarketScreen() {
             </View>
           }
         >
-          <ViewToggle
-            mode={viewMode}
-            onToggle={setViewMode}
-            itemCount={totalItems}
-            onNewList={handleNewList}
-          />
-          <View style={styles.productListContent}>
-            {totalItems === 0 ? (
-              <EmptyList />
-            ) : (
-              groupedItems.map(([cat, catItems]) => (
-                <CategoryGroup
-                  key={cat}
-                  category={cat}
-                  items={catItems}
-                  exchangeRate={exchangeRateValue}
-                  viewMode={viewMode}
-                  onToggle={handleToggleItem}
-                  onDelete={handleDeleteItem}
-                  onEdit={handleEditItem}
-                  onQuantityChange={handleQuantityChange}
-                />
-              ))
-            )}
+          <View
+            style={[
+              styles.listSection,
+              {
+                backgroundColor: colors.backgroundSecondary,
+                minHeight: listViewportMinHeight,
+              },
+            ]}
+          >
+            <ViewToggle
+              mode={viewMode}
+              onToggle={setViewMode}
+              itemCount={totalItems}
+              onNewList={handleNewList}
+            />
+            <View style={styles.productListContent}>
+              {totalItems === 0 ? (
+                <EmptyList />
+              ) : (
+                groupedItems.map(([cat, catItems]) => (
+                  <CategoryGroup
+                    key={cat}
+                    category={cat}
+                    items={catItems}
+                    exchangeRate={exchangeRateValue}
+                    viewMode={viewMode}
+                    onToggle={handleToggleItem}
+                    onDelete={handleDeleteItem}
+                    onEdit={handleEditItem}
+                    onQuantityChange={handleQuantityChange}
+                  />
+                ))
+              )}
+            </View>
           </View>
-        </ParallaxScrollView>
+        </FadeHeaderScrollView>
         {/* Inline add/edit product section */}
         <View
           style={[
@@ -379,7 +385,7 @@ export default function SupermarketScreen() {
             onAdd={handleAddProduct}
             onCancelEdit={handleCancelEdit}
             initialName={editingItem?.productName}
-            initialPrice={editingItem?.unitPriceLocal?.toString()}
+            initialPrice={editingInitialPrice}
             priceInLocal={priceInLocal}
           />
         </View>

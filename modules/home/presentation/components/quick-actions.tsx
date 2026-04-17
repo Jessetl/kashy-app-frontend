@@ -1,12 +1,7 @@
 import { AppPressable } from '@/shared/presentation/components/ui';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { useRouter } from 'expo-router';
-import {
-  ListPlus,
-  PlusCircle,
-  Receipt,
-  TrendingUp,
-} from 'lucide-react-native';
+import { ListPlus, PlusCircle, Receipt, TrendingUp } from 'lucide-react-native';
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -66,10 +61,13 @@ export const QuickActions = React.memo(function QuickActions() {
         <AppPressable
           key={action.label}
           onPress={() => handlePress(action.route)}
-          style={[styles.action, { backgroundColor: colors.backgroundSecondary }]}
+          style={[
+            styles.action,
+            { backgroundColor: colors.backgroundSecondary },
+          ]}
         >
           <View style={[styles.iconWrap, { backgroundColor: action.bgColor }]}>
-            <action.Icon size={20} color={action.color} pointerEvents="none" />
+            <action.Icon size={20} color={action.color} pointerEvents='none' />
           </View>
           <Text
             style={[styles.label, { color: colors.textOnSurface }]}

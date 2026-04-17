@@ -1,5 +1,5 @@
 import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
-import { ParallaxScrollView } from '@/shared/presentation/components/parallax-scroll-view';
+import { FadeHeaderScrollView } from '@/shared/presentation/components/fade-header-scroll-view';
 import {
   AppPressable,
   BottomSheetModal,
@@ -76,17 +76,6 @@ export default function DebtsScreen() {
 
   const exchangeRate = rate?.rateLocalPerUsd ?? null;
 
-  const parallaxIntensity = useMemo(
-    () => ({
-      stickyDistance: Math.max(104, Math.min(196, windowHeight * 0.24)),
-      followAfterSticky: 0.86,
-      liftMax: 72,
-      liftRange: 220,
-      pullDownScale: 1.035,
-    }),
-    [windowHeight],
-  );
-
   const listViewportMinHeight = useMemo(
     () => Math.max(0, windowHeight - insets.top - 48),
     [windowHeight, insets.top],
@@ -95,17 +84,9 @@ export default function DebtsScreen() {
   return (
     <View style={[styles.flex, { backgroundColor: colors.background }]}>
       <View style={[styles.flex, { paddingTop: insets.top }]}>
-        <ParallaxScrollView
-          intensity={parallaxIntensity}
+        <FadeHeaderScrollView
           contentContainerStyle={styles.scrollContent}
           headerStyle={styles.headerContainer}
-          contentStyle={[
-            styles.listSection,
-            {
-              backgroundColor: colors.backgroundSecondary,
-              minHeight: listViewportMinHeight,
-            },
-          ]}
           refreshing={isLoading}
           onRefresh={reload}
           refreshTintColor={colors.primary}
@@ -139,30 +120,40 @@ export default function DebtsScreen() {
             </View>
           }
         >
-          {/* Debt List */}
-          <View style={styles.debtListContent}>
-            {isLoading && debts.length === 0 ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size='large' color={colors.primary} />
-              </View>
-            ) : debts.length === 0 ? (
-              <EmptyDebts isCollection={activeTab === 'collections'} />
-            ) : (
-              <View style={styles.listContainer}>
-                {debts.map((debt) => (
-                  <DebtCard
-                    key={debt.id}
-                    debt={debt}
-                    exchangeRate={exchangeRate}
-                    onPress={handleDebtPress}
-                    onMarkAsPaid={markAsPaid}
-                    onDelete={deleteDebt}
-                  />
-                ))}
-              </View>
-            )}
+          <View
+            style={[
+              styles.listSection,
+              {
+                backgroundColor: colors.backgroundSecondary,
+                minHeight: listViewportMinHeight,
+              },
+            ]}
+          >
+            {/* Debt List */}
+            <View style={styles.debtListContent}>
+              {isLoading && debts.length === 0 ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size='large' color={colors.primary} />
+                </View>
+              ) : debts.length === 0 ? (
+                <EmptyDebts isCollection={activeTab === 'collections'} />
+              ) : (
+                <View style={styles.listContainer}>
+                  {debts.map((debt) => (
+                    <DebtCard
+                      key={debt.id}
+                      debt={debt}
+                      exchangeRate={exchangeRate}
+                      onPress={handleDebtPress}
+                      onMarkAsPaid={markAsPaid}
+                      onDelete={deleteDebt}
+                    />
+                  ))}
+                </View>
+              )}
+            </View>
           </View>
-        </ParallaxScrollView>
+        </FadeHeaderScrollView>
       </View>
 
       {/* FAB */}

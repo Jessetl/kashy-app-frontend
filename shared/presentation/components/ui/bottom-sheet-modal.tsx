@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
@@ -122,56 +121,56 @@ export const BottomSheetModal = React.memo(function BottomSheetModal({
       </Animated.View>
 
       {/* Sheet */}
-      <GestureDetector gesture={panGesture}>
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.backgroundSecondary,
-              paddingBottom: insets.bottom + 20,
-              height: modalHeight,
-            },
-            animatedModalStyle,
-          ]}
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: colors.backgroundSecondary,
+            paddingBottom: insets.bottom + 20,
+            height: modalHeight,
+          },
+          animatedModalStyle,
+        ]}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.flex}
         >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.flex}
-          >
-            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-              <View style={styles.content}>
-                {/* Drag Handle */}
-                <View style={styles.handleContainer}>
-                  <View
-                    style={[styles.handle, { backgroundColor: colors.border }]}
-                  />
-                </View>
-
-                {/* Close Button */}
-                {showCloseButton && (
-                  <AppPressable
-                    onPress={dismiss}
-                    style={[
-                      styles.closeButton,
-                      { backgroundColor: colors.backgroundTertiary },
-                    ]}
-                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                  >
-                    <X
-                      pointerEvents='none'
-                      size={20}
-                      color={colors.textOnSurface}
-                      strokeWidth={2.5}
-                    />
-                  </AppPressable>
-                )}
-
-                {children}
+          <View style={styles.content}>
+            {/* Drag Handle — only this area listens to the dismiss-by-drag
+                gesture, so any ScrollView/FlatList rendered as children can
+                scroll freely without competing with the sheet's pan. */}
+            <GestureDetector gesture={panGesture}>
+              <View style={styles.handleContainer}>
+                <View
+                  style={[styles.handle, { backgroundColor: colors.border }]}
+                />
               </View>
-            </TouchableWithoutFeedback>
-          </KeyboardAvoidingView>
-        </Animated.View>
-      </GestureDetector>
+            </GestureDetector>
+
+            {/* Close Button */}
+            {showCloseButton && (
+              <AppPressable
+                onPress={dismiss}
+                style={[
+                  styles.closeButton,
+                  { backgroundColor: colors.backgroundTertiary },
+                ]}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+              >
+                <X
+                  pointerEvents='none'
+                  size={20}
+                  color={colors.textOnSurface}
+                  strokeWidth={2.5}
+                />
+              </AppPressable>
+            )}
+
+            {children}
+          </View>
+        </KeyboardAvoidingView>
+      </Animated.View>
     </View>
   );
 });
@@ -199,8 +198,10 @@ const styles = StyleSheet.create({
   },
   handleContainer: {
     alignItems: 'center',
+    // Taller touch target so users can grab the handle without needing to
+    // hit the tiny 40x4 pill exactly.
     paddingTop: 12,
-    paddingBottom: 8,
+    paddingBottom: 12,
   },
   handle: {
     width: 40,
