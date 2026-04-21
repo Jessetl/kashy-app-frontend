@@ -86,7 +86,9 @@ export default function SupermarketScreen() {
 
   // Auto-dismiss transient error messages after a few seconds.
   useEffect(() => {
-    if (!error) return;
+    if (!error) {
+      return;
+    }
     const timeout = setTimeout(clearError, 4000);
     return () => clearTimeout(timeout);
   }, [error, clearError]);
@@ -108,8 +110,8 @@ export default function SupermarketScreen() {
     () => items.filter((i) => i.isPurchased).length,
     [items],
   );
-  const totalItems = items.length;
 
+  const totalItems = items.length;
   const totalLocal = activeList?.totalLocal ?? 0;
   const totalUsd = rate ? localToUsd(totalLocal) : 0;
 

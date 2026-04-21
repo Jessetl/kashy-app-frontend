@@ -18,6 +18,7 @@ Guía detallada con ejemplos de código para cada capa de Clean Architecture. Le
 10. [Presentation — Hooks](#presentation-layer--hooks)
 11. [Presentation — Screens](#presentation-layer--screens)
 12. [app/ — Thin Wrappers (Expo Router)](#app--thin-wrappers-expo-router)
+13. [Convenciones de Nomenclatura](#convenciones-de-nomenclatura)
 
 ---
 
@@ -502,3 +503,21 @@ export { default } from '@/modules/debts/presentation/screens/debts.screen';
 **Regla absoluta:** si necesitas importar un hook, un componente, o cualquier lógica dentro de `app/`, es señal de que ese código debe vivir en `modules/` o `shared/` en su lugar.
 
 La única excepción son los **layouts** (`_layout.tsx`) que necesitan configurar providers globales, tab bars, y wrappers de navegación — pero incluso estos deben importar componentes desde `shared/`, no definirlos inline.
+
+---
+
+## Convenciones de Nomenclatura
+
+| Artefacto           | Convención                         | Ejemplo                   |
+| ------------------- | ---------------------------------- | ------------------------- |
+| Entity              | `[nombre].entity.ts`               | `user.entity.ts`          |
+| Value Object        | `[nombre].vo.ts`                   | `email.vo.ts`             |
+| Error de dominio    | `[módulo].errors.ts`               | `auth.errors.ts`          |
+| Port (interfaz)     | `[módulo].port.ts`                 | `auth.port.ts`            |
+| DTO                 | `[nombre]-[accion].dto.ts`         | `login-request.dto.ts`    |
+| Mapper              | `[entity].mapper.ts`               | `user.mapper.ts`          |
+| Use Case            | `[verbo]-[sustantivo].use-case.ts` | `login.use-case.ts`       |
+| Datasource          | `[módulo].datasource.ts`           | `auth.datasource.ts`      |
+| Hook                | `use-[accion].ts`                  | `use-login.ts`            |
+| Screen              | `[nombre].screen.tsx`              | `login.screen.tsx`        |
+| Store (Zustand)     | `[módulo].store.ts`                | `auth.store.ts`           |
