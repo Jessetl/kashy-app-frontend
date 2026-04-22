@@ -10,24 +10,18 @@ import {
 } from './push-notification.service';
 
 interface PushNotificationStoreState extends PushNotificationState {
-  /** Si la inicialización está en curso */
   isInitializing: boolean;
-  /** Si ya se intentó inicializar al menos una vez */
   hasInitialized: boolean;
 
-  /** Inicializa push: pide permiso, obtiene token, registra en backend */
   initialize: () => Promise<void>;
-  /** Verifica el estado del permiso sin solicitar (para refrescar en foreground) */
   refreshPermissionStatus: () => Promise<void>;
-  /** Limpia el token (logout o desactivar push) */
   clearToken: () => Promise<void>;
-  /** Actualiza el estado del permiso manualmente */
   setPermissionStatus: (status: PushPermissionStatus) => void;
 }
 
 export const usePushNotificationStore = create<PushNotificationStoreState>()(
   (set, get) => ({
-    expoPushToken: null,
+    pushToken: null,
     permissionStatus: 'undetermined',
     isInitializing: false,
     hasInitialized: false,
@@ -39,7 +33,7 @@ export const usePushNotificationStore = create<PushNotificationStoreState>()(
       try {
         const result = await initializePushNotifications();
         set({
-          expoPushToken: result.expoPushToken,
+          pushToken: result.pushToken,
           permissionStatus: result.permissionStatus,
           hasInitialized: true,
         });
@@ -58,7 +52,7 @@ export const usePushNotificationStore = create<PushNotificationStoreState>()(
 
     clearToken: async () => {
       await removePushTokenFromServer();
-      set({ expoPushToken: null });
+      set({ pushToken: null });
     },
 
     setPermissionStatus: (status) => set({ permissionStatus: status }),

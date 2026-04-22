@@ -11,12 +11,18 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.kashy",
+      "googleServicesFile": "./GoogleService-Info.plist",
+      "entitlements": {
+        "aps-environment": "development"
+      },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Kashy usa tu ubicacion para completar automaticamente tu ciudad y mejorar tu experiencia en la app."
+        "NSLocationWhenInUseUsageDescription": "Kashy usa tu ubicacion para completar automaticamente tu ciudad y mejorar tu experiencia en la app.",
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
       "package": "com.anonymous.kashy",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#63E696",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -45,15 +51,15 @@
         }
       ],
       "expo-secure-store",
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
       [
-        "expo-notifications",
+        "expo-build-properties",
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#63E696",
-          "defaultChannel": "default",
-          "enableBackgroundRemoteNotifications": true
+          "ios": { "useFrameworks": "static" }
         }
-      ]
+      ],
+      "./plugins/with-notifee-maven-repo.js"
     ],
     "experiments": {
       "tsconfigPaths": true,

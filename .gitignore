@@ -46,3 +46,7 @@ app-example
 
 # core ia 
 ARCHITECTURE_MASTER.md
+
+# Firebase
+google-services.json
+GoogleService-Info.plist

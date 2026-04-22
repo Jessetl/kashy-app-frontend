@@ -66,7 +66,7 @@ export function useNotificationPreferences() {
 
         // Permiso OK — actualizar push token en el push store
         usePushNotificationStore.setState({
-          expoPushToken: result.expoPushToken,
+          pushToken: result.pushToken,
           permissionStatus: result.permissionStatus,
         });
 

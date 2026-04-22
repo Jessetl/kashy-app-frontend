@@ -1,19 +1,25 @@
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
+import {
+  registerPushTokenOnServer,
+  type PushPlatform,
+} from '@/shared/infrastructure/notifications/push-notification.service';
 import { usePushNotificationStore } from '@/shared/infrastructure/notifications/push-notification.store';
-import * as Notifications from 'expo-notifications';
+import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+import {
+  getInitialNotification,
+  getMessaging,
+  onMessage,
+  onNotificationOpenedApp,
+  onTokenRefresh,
+} from '@react-native-firebase/messaging';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
-import { AppState } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
-/**
- * Hook que inicializa y gestiona push notifications en toda la app.
- * Debe montarse UNA sola vez en el root layout.
- *
- * - Inicializa push cuando el usuario está autenticado.
- * - Escucha notificaciones recibidas y tocadas.
- * - Refresca el estado del permiso al volver al foreground.
- * - Limpia el token al cerrar sesión.
- */
+const ANDROID_CHANNEL_ID = 'default';
+
+type NotificationData = Record<string, string | number | object | undefined>;
+
 export function usePushNotifications() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
@@ -25,8 +31,16 @@ export function usePushNotifications() {
   const clearToken = usePushNotificationStore((s) => s.clearToken);
 
   const router = useRouter();
-  const responseListener = useRef<Notifications.EventSubscription | null>(null);
-  const receivedListener = useRef<Notifications.EventSubscription | null>(null);
+
+  const handleNotificationTap = useCallback(
+    (data: NotificationData | undefined) => {
+      if (!data) return;
+      if (data.type === 'debt_due_reminder' && data.debtId) {
+        router.push(`/(tabs)/debts/${String(data.debtId)}`);
+      }
+    },
+    [router],
+  );
 
   // Inicializar cuando el usuario se autentica
   useEffect(() => {
@@ -46,37 +60,80 @@ export function usePushNotifications() {
     prevAuth.current = isAuthenticated;
   }, [isAuthenticated, clearToken]);
 
-  // Listener: notificación recibida en foreground
+  // Re-registrar token si FCM lo rota
   useEffect(() => {
-    receivedListener.current =
-      Notifications.addNotificationReceivedListener((notification) => {
-        console.log('[Push] Notificación recibida:', notification.request.content.title);
-      });
+    if (!isAuthenticated) return;
 
-    return () => {
-      receivedListener.current?.remove();
-    };
+    const unsubscribe = onTokenRefresh(getMessaging(), (newToken) => {
+      if (newToken) {
+        void registerPushTokenOnServer(newToken, Platform.OS as PushPlatform);
+        usePushNotificationStore.setState({ pushToken: newToken });
+      }
+    });
+
+    return unsubscribe;
+  }, [isAuthenticated]);
+
+  // Mensaje recibido en foreground → mostrarlo con notifee
+  useEffect(() => {
+    const unsubscribe = onMessage(getMessaging(), async (remoteMessage) => {
+      if (Platform.OS === 'android') {
+        await notifee.createChannel({
+          id: ANDROID_CHANNEL_ID,
+          name: 'Kashy',
+          importance: AndroidImportance.HIGH,
+          sound: 'default',
+          vibration: true,
+        });
+      }
+
+      await notifee.displayNotification({
+        title: remoteMessage.notification?.title ?? 'Kashy',
+        body: remoteMessage.notification?.body ?? '',
+        data: remoteMessage.data,
+        android: {
+          channelId: ANDROID_CHANNEL_ID,
+          smallIcon: 'ic_notification',
+          color: '#63E696',
+          pressAction: { id: 'default' },
+        },
+        ios: { sound: 'default' },
+      });
+    });
+
+    return unsubscribe;
   }, []);
 
-  // Listener: usuario toca la notificación
+  // Tap en notificación mientras la app está en foreground
   useEffect(() => {
-    responseListener.current =
-      Notifications.addNotificationResponseReceivedListener((response) => {
-        const data = response.notification.request.content.data;
+    return notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === EventType.PRESS) {
+        handleNotificationTap(detail.notification?.data as NotificationData);
+      }
+    });
+  }, [handleNotificationTap]);
 
-        // Navegar según el tipo de notificación
-        if (data?.type === 'debt_due_reminder' && data?.debtId) {
-          router.push(`/(tabs)/debts/${data.debtId as string}`);
-        }
-      });
+  // Tap cuando la app estaba en background y se abre
+  useEffect(() => {
+    const unsubscribe = onNotificationOpenedApp(
+      getMessaging(),
+      (remoteMessage) => {
+        handleNotificationTap(remoteMessage.data as NotificationData);
+      },
+    );
+    return unsubscribe;
+  }, [handleNotificationTap]);
 
-    return () => {
-      responseListener.current?.remove();
-    };
-  }, [router]);
+  // Tap cuando la app estaba cerrada (killed) y se abrió desde la notificación
+  useEffect(() => {
+    void getInitialNotification(getMessaging()).then((remoteMessage) => {
+      if (remoteMessage) {
+        handleNotificationTap(remoteMessage.data as NotificationData);
+      }
+    });
+  }, [handleNotificationTap]);
 
   // Refrescar estado del permiso cuando la app vuelve al foreground
-  // (el usuario puede haber cambiado permisos en Ajustes del SO)
   const handleAppStateChange = useCallback(
     (nextAppState: string) => {
       if (nextAppState === 'active' && isAuthenticated) {
