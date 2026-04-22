@@ -1,3 +1,4 @@
+import { formatLocalDateDisplay } from '@/shared/domain/date/local-date';
 import { AppPressable } from '@/shared/presentation/components/ui';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { useCountry } from '@/shared/presentation/hooks/use-country';
@@ -58,7 +59,7 @@ export const DebtCard = React.memo(
         exchangeRate && exchangeRate > 0 ? total * exchangeRate : null;
 
       const dueDateFormatted = debt.dueDate
-        ? new Date(debt.dueDate).toLocaleDateString('es-VE', {
+        ? formatLocalDateDisplay(debt.dueDate, country.locale, {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
@@ -66,7 +67,7 @@ export const DebtCard = React.memo(
         : null;
 
       return { total, localAmount, dueDateFormatted };
-    }, [debt.amountUsd, debt.interestRatePct, debt.dueDate, exchangeRate]);
+    }, [debt.amountUsd, debt.interestRatePct, debt.dueDate, exchangeRate, country.locale]);
 
     const handleDelete = () => {
       Alert.alert(

@@ -17,11 +17,16 @@
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Kashy usa tu ubicacion para completar automaticamente tu ciudad y mejorar tu experiencia en la app.",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": ["remote-notification"],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        }
       }
     },
     "android": {
       "package": "com.anonymous.kashy",
+      "permissions": ["POST_NOTIFICATIONS"],
+      "usesCleartextTraffic": true,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#63E696",
@@ -59,7 +64,9 @@
           "ios": { "useFrameworks": "static" }
         }
       ],
-      "./plugins/with-notifee-maven-repo.js"
+      "./plugins/with-notifee-maven-repo.js",
+      "./plugins/with-notification-icon.js",
+      "./plugins/with-firebase-ios-configure.js"
     ],
     "experiments": {
       "tsconfigPaths": true,

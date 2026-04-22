@@ -1,10 +1,14 @@
-import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
-import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
-import { useDebtStore } from '@/modules/debts/infrastructure/store/debt.store';
-import { useShoppingListStore } from '@/modules/supermarket/infrastructure/store/shopping-list.store';
-import { useCallback, useEffect, useRef, useMemo } from 'react';
 import type { Debt } from '@/modules/debts/domain/entities/debt.entity';
-import { isOverdue, calculateTotalWithInterest } from '@/modules/debts/domain/entities/debt.entity';
+import {
+  calculateTotalWithInterest,
+  isOverdue,
+} from '@/modules/debts/domain/entities/debt.entity';
+import { useDebtStore } from '@/modules/debts/infrastructure/store/debt.store';
+import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
+import { useShoppingListStore } from '@/modules/supermarket/infrastructure/store/shopping-list.store';
+import { localDateToMs } from '@/shared/domain/date/local-date';
+import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 export interface HomeSummary {
   // Auth
@@ -36,7 +40,11 @@ export interface HomeSummary {
 
 export function useHomeSummary(): HomeSummary {
   const { isAuthenticated, user } = useAuth();
-  const { rate, isLoading: isRateLoading, reload: reloadRate } = useExchangeRate();
+  const {
+    rate,
+    isLoading: isRateLoading,
+    reload: reloadRate,
+  } = useExchangeRate();
   const didInit = useRef(false);
 
   // Debt store selectors
@@ -62,28 +70,38 @@ export function useHomeSummary(): HomeSummary {
   // Debts calculations
   const debtsSummary = useMemo(() => {
     const unpaidDebts = allDebts.filter((d) => !d.isPaid && !d.isCollection);
-    const unpaidCollections = allDebts.filter((d) => !d.isPaid && d.isCollection);
+    const unpaidCollections = allDebts.filter(
+      (d) => !d.isPaid && d.isCollection,
+    );
 
     const totalDebts = unpaidDebts.reduce(
-      (sum, d) => sum + calculateTotalWithInterest(d.amountUsd, d.interestRatePct),
+      (sum, d) =>
+        sum + calculateTotalWithInterest(d.amountUsd, d.interestRatePct),
       0,
     );
     const totalCollections = unpaidCollections.reduce(
-      (sum, d) => sum + calculateTotalWithInterest(d.amountUsd, d.interestRatePct),
+      (sum, d) =>
+        sum + calculateTotalWithInterest(d.amountUsd, d.interestRatePct),
       0,
     );
 
     // Upcoming: unpaid debts/collections sorted by due date, max 3
     const upcoming = allDebts
       .filter((d) => !d.isPaid && d.dueDate)
-      .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
+      .sort((a, b) => localDateToMs(a.dueDate!) - localDateToMs(b.dueDate!))
       .slice(0, 3);
 
     const overdueCount = allDebts.filter(
       (d) => !d.isPaid && isOverdue(d.dueDate),
     ).length;
 
-    return { totalDebts, totalCollections, balance: totalCollections - totalDebts, upcoming, overdueCount };
+    return {
+      totalDebts,
+      totalCollections,
+      balance: totalCollections - totalDebts,
+      upcoming,
+      overdueCount,
+    };
   }, [allDebts]);
 
   // Shopping summary

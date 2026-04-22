@@ -1,5 +1,6 @@
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
+import { useCountry } from '@/shared/presentation/hooks/use-country';
 import {
   AlertTriangle,
   Clock,
@@ -30,7 +31,7 @@ interface NotificationItemProps {
   onPress: (notification: AppNotification) => void;
 }
 
-function formatRelativeTime(iso: string): string {
+function formatRelativeTime(iso: string, locale: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'Ahora';
@@ -39,7 +40,7 @@ function formatRelativeTime(iso: string): string {
   if (hrs < 24) return `Hace ${hrs} h`;
   const days = Math.floor(hrs / 24);
   if (days < 7) return `Hace ${days} d`;
-  return new Date(iso).toLocaleDateString('es-VE', {
+  return new Date(iso).toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
   });
@@ -51,6 +52,7 @@ export const NotificationItem = React.memo(function NotificationItem({
   onPress,
 }: NotificationItemProps) {
   const { colors } = useAppTheme();
+  const { country } = useCountry();
   const Icon = ICON_MAP[notification.type];
 
   const severityColor = useMemo(() => {
@@ -111,7 +113,7 @@ export const NotificationItem = React.memo(function NotificationItem({
           {notification.message}
         </Text>
         <Text style={[styles.timeText, { color: colors.textTertiary }]}>
-          {formatRelativeTime(notification.createdAt)}
+          {formatRelativeTime(notification.createdAt, country.locale)}
         </Text>
       </View>
     </AppPressable>

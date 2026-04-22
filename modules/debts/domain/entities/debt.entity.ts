@@ -1,3 +1,5 @@
+import { isPastLocalDate } from '@/shared/domain/date/local-date';
+
 /** Prioridad de una deuda */
 export type DebtPriority = 'HIGH' | 'MEDIUM' | 'LOW';
 
@@ -76,5 +78,5 @@ export function calculateTotalWithInterest(
 /** Verifica si una deuda está vencida */
 export function isOverdue(dueDate: string | null): boolean {
   if (!dueDate) return false;
-  return new Date(dueDate) < new Date();
+  return isPastLocalDate(dueDate);
 }

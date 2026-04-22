@@ -27,7 +27,9 @@ export const usePushNotificationStore = create<PushNotificationStoreState>()(
     hasInitialized: false,
 
     initialize: async () => {
-      if (get().isInitializing) return;
+      if (get().isInitializing) {
+        return;
+      }
 
       set({ isInitializing: true });
       try {

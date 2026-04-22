@@ -1,4 +1,5 @@
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
+import { useCountry } from '@/shared/presentation/hooks/use-country';
 import {
   Calendar,
   ChevronDown,
@@ -70,9 +71,9 @@ function toDateString(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
-function formatDisplay(dateStr: string): string {
+function formatDisplay(dateStr: string, locale: string): string {
   const date = parseLocalDate(dateStr);
-  return date.toLocaleDateString('es-VE', {
+  return date.toLocaleDateString(locale, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -105,6 +106,7 @@ export const AppCalendarInput = React.memo(function AppCalendarInput({
   disabled = false,
 }: AppCalendarInputProps) {
   const colors = useThemeColors();
+  const { country } = useCountry();
   const [visible, setVisible] = useState(false);
   const [pickerView, setPickerView] = useState<PickerView>('days');
 
@@ -498,7 +500,7 @@ export const AppCalendarInput = React.memo(function AppCalendarInput({
           ]}
           numberOfLines={1}
         >
-          {value ? formatDisplay(value) : placeholder}
+          {value ? formatDisplay(value, country.locale) : placeholder}
         </Text>
         {value !== '' && (
           <AppPressable

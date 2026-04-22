@@ -1,11 +1,26 @@
+import { formatLocalDateDisplay } from '@/shared/domain/date/local-date';
 import { AppPressable } from '@/shared/presentation/components/ui';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
+import { useCountry } from '@/shared/presentation/hooks/use-country';
+import { formatUsdAmount } from '@/shared/presentation/utils/format-currency';
 import { useRouter } from 'expo-router';
-import { AlertCircle, ArrowDownCircle, Calendar, MinusCircle } from 'lucide-react-native';
+import {
+  AlertCircle,
+  ArrowDownCircle,
+  Calendar,
+  MinusCircle,
+} from 'lucide-react-native';
+
+import type {
+  Debt,
+  DebtPriority,
+} from '@/modules/debts/domain/entities/debt.entity';
+import {
+  calculateTotalWithInterest,
+  isOverdue,
+} from '@/modules/debts/domain/entities/debt.entity';
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import type { Debt, DebtPriority } from '@/modules/debts/domain/entities/debt.entity';
-import { isOverdue, calculateTotalWithInterest } from '@/modules/debts/domain/entities/debt.entity';
 
 interface UpcomingDebtsProps {
   debts: Debt[];
@@ -23,12 +38,11 @@ const PRIORITY_ICONS: Record<DebtPriority, typeof AlertCircle> = {
   LOW: ArrowDownCircle,
 };
 
-import { formatUsdAmount } from '@/shared/presentation/utils/format-currency';
-
 export const UpcomingDebts = React.memo(function UpcomingDebts({
   debts,
 }: UpcomingDebtsProps) {
   const { colors } = useAppTheme();
+  const { country } = useCountry();
   const router = useRouter();
 
   const handlePress = useCallback(
@@ -48,12 +62,15 @@ export const UpcomingDebts = React.memo(function UpcomingDebts({
       <View style={styles.list}>
         {debts.map((debt) => {
           const overdue = isOverdue(debt.dueDate);
-          const total = calculateTotalWithInterest(debt.amountUsd, debt.interestRatePct);
+          const total = calculateTotalWithInterest(
+            debt.amountUsd,
+            debt.interestRatePct,
+          );
           const priorityColor = PRIORITY_COLORS[debt.priority];
           const PriorityIcon = PRIORITY_ICONS[debt.priority];
 
           const dueDateFormatted = debt.dueDate
-            ? new Date(debt.dueDate).toLocaleDateString('es-VE', {
+            ? formatLocalDateDisplay(debt.dueDate, country.locale, {
                 day: '2-digit',
                 month: 'short',
               })
@@ -74,7 +91,7 @@ export const UpcomingDebts = React.memo(function UpcomingDebts({
               <PriorityIcon
                 size={16}
                 color={overdue ? colors.danger : priorityColor}
-                pointerEvents="none"
+                pointerEvents='none'
               />
               <View style={styles.itemContent}>
                 <Text
@@ -87,7 +104,7 @@ export const UpcomingDebts = React.memo(function UpcomingDebts({
                   <Calendar
                     size={11}
                     color={overdue ? colors.danger : colors.textSecondary}
-                    pointerEvents="none"
+                    pointerEvents='none'
                   />
                   <Text
                     style={[
@@ -100,10 +117,19 @@ export const UpcomingDebts = React.memo(function UpcomingDebts({
                 </View>
               </View>
               <View style={styles.itemRight}>
-                <Text style={[styles.itemAmount, { color: colors.textOnSurface }]}>
+                <Text
+                  style={[styles.itemAmount, { color: colors.textOnSurface }]}
+                >
                   {formatUsdAmount(total)}
                 </Text>
-                <Text style={[styles.itemType, { color: debt.isCollection ? colors.success : colors.danger }]}>
+                <Text
+                  style={[
+                    styles.itemType,
+                    {
+                      color: debt.isCollection ? colors.success : colors.danger,
+                    },
+                  ]}
+                >
                   {debt.isCollection ? 'Cobro' : 'Deuda'}
                 </Text>
               </View>

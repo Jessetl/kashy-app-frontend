@@ -2,6 +2,11 @@ import { useDebtStore } from '@/modules/debts/infrastructure/store/debt.store';
 import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
 import { useShoppingListStore } from '@/modules/supermarket/infrastructure/store/shopping-list.store';
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
+import {
+  formatLocalDateDisplay,
+  localDateToMs,
+} from '@/shared/domain/date/local-date';
+import { useCountry } from '@/shared/presentation/hooks/use-country';
 import { useCallback, useMemo } from 'react';
 import type { AppNotification } from '../../domain/entities/notification.entity';
 import { useNotificationStore } from '../../infrastructure/store/notification.store';
@@ -15,9 +20,11 @@ function todayKey(): string {
   return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
 
-function formatShortDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short' });
+function formatShortDate(dueDate: string, locale: string): string {
+  return formatLocalDateDisplay(dueDate, locale, {
+    day: '2-digit',
+    month: 'short',
+  });
 }
 
 export interface UseNotificationsResult {
@@ -38,6 +45,7 @@ export function useNotifications(): UseNotificationsResult {
   const summaryDebts = useDebtStore((s) => s.summaryDebts);
   const lists = useShoppingListStore((s) => s.lists);
   const { rate } = useExchangeRate();
+  const { country } = useCountry();
 
   const readIds = useNotificationStore((s) => s.readIds);
   const markAsReadStore = useNotificationStore((s) => s.markAsRead);
@@ -54,7 +62,7 @@ export function useNotifications(): UseNotificationsResult {
     for (const debt of summaryDebts) {
       if (debt.isPaid || !debt.dueDate) continue;
 
-      const dueMs = new Date(debt.dueDate).getTime();
+      const dueMs = localDateToMs(debt.dueDate);
       const diffMs = dueMs - now;
       const isCollection = debt.isCollection;
 
@@ -83,7 +91,7 @@ export function useNotifications(): UseNotificationsResult {
           title: isCollection
             ? `Cobro por vencer: ${debt.title}`
             : `Deuda por vencer: ${debt.title}`,
-          message: `Vence ${formatShortDate(debt.dueDate)}. Prepárate con anticipación.`,
+          message: `Vence ${formatShortDate(debt.dueDate, country.locale)}. Prepárate con anticipación.`,
           createdAt: new Date(now).toISOString(),
           relatedId: debt.id,
         });
@@ -144,7 +152,7 @@ export function useNotifications(): UseNotificationsResult {
     });
 
     return result;
-  }, [isAuthenticated, summaryDebts, lists, rate]);
+  }, [isAuthenticated, summaryDebts, lists, rate, country.locale]);
 
   const unreadCount = useMemo(
     () => notifications.filter((n) => !readIds.has(n.id)).length,

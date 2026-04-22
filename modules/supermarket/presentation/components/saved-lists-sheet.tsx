@@ -1,5 +1,6 @@
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
+import { useCountry } from '@/shared/presentation/hooks/use-country';
 import {
   ChevronRight,
   FolderOpen,
@@ -23,9 +24,9 @@ interface SavedListsSheetProps {
   onSelect: (list: ShoppingList) => void;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const d = new Date(iso);
-  return d.toLocaleDateString('es-VE', {
+  return d.toLocaleDateString(locale, {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
@@ -39,6 +40,7 @@ export const SavedListsSheet = React.memo(function SavedListsSheet({
   onSelect,
 }: SavedListsSheetProps) {
   const colors = useThemeColors();
+  const { country } = useCountry();
 
   if (isLoading) {
     return (
@@ -138,7 +140,7 @@ export const SavedListsSheet = React.memo(function SavedListsSheet({
                   {list.items.length === 1 ? 'producto' : 'productos'}
                 </Text>
                 <Text style={[styles.metaText, { color: colors.textTertiary }]}>
-                  {formatDate(list.createdAt)}
+                  {formatDate(list.createdAt, country.locale)}
                 </Text>
               </View>
             </View>

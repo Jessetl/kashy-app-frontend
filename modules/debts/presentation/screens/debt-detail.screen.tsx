@@ -1,4 +1,5 @@
 import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
+import { formatLocalDateDisplay } from '@/shared/domain/date/local-date';
 import {
   AppPressable,
   BottomSheetModal,
@@ -158,7 +159,7 @@ export default function DebtDetailScreen() {
   const overdue = isOverdue(debt.dueDate);
 
   const dueDateFormatted = debt.dueDate
-    ? new Date(debt.dueDate).toLocaleDateString('es-VE', {
+    ? formatLocalDateDisplay(debt.dueDate, country.locale, {
         weekday: 'long',
         day: '2-digit',
         month: 'long',

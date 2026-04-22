@@ -15,10 +15,11 @@ setBackgroundMessageHandler(getMessaging(), async (remoteMessage) => {
     vibration: true,
   });
 
+  const data = remoteMessage.data ?? {};
   await notifee.displayNotification({
-    title: remoteMessage.notification?.title ?? 'Kashy',
-    body: remoteMessage.notification?.body ?? '',
-    data: remoteMessage.data,
+    title: String(data.title ?? remoteMessage.notification?.title ?? 'Kashy'),
+    body: String(data.body ?? remoteMessage.notification?.body ?? ''),
+    data,
     android: {
       channelId,
       smallIcon: 'ic_notification',

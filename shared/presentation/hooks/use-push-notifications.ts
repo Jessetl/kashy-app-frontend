@@ -34,7 +34,9 @@ export function usePushNotifications() {
 
   const handleNotificationTap = useCallback(
     (data: NotificationData | undefined) => {
-      if (!data) return;
+      if (!data) {
+        return;
+      }
       if (data.type === 'debt_due_reminder' && data.debtId) {
         router.push(`/(tabs)/debts/${String(data.debtId)}`);
       }
@@ -44,10 +46,9 @@ export function usePushNotifications() {
 
   // Inicializar cuando el usuario se autentica
   useEffect(() => {
-    if (!hasHydrated) return;
-    if (!isAuthenticated) return;
-    if (hasInitialized) return;
-
+    if (!hasHydrated || !isAuthenticated || hasInitialized) {
+      return;
+    }
     void initialize();
   }, [isAuthenticated, hasHydrated, hasInitialized, initialize]);
 
@@ -87,10 +88,11 @@ export function usePushNotifications() {
         });
       }
 
+      const data = remoteMessage.data ?? {};
       await notifee.displayNotification({
-        title: remoteMessage.notification?.title ?? 'Kashy',
-        body: remoteMessage.notification?.body ?? '',
-        data: remoteMessage.data,
+        title: String(data.title ?? remoteMessage.notification?.title ?? 'Kashy'),
+        body: String(data.body ?? remoteMessage.notification?.body ?? ''),
+        data,
         android: {
           channelId: ANDROID_CHANNEL_ID,
           smallIcon: 'ic_notification',
