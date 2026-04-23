@@ -44,6 +44,7 @@ export const AddProductForm = React.memo(function AddProductForm({
     if (prevPriceInLocalRef.current === priceInLocal) {
       return;
     }
+
     const wasLocal = prevPriceInLocalRef.current;
     prevPriceInLocalRef.current = priceInLocal;
 

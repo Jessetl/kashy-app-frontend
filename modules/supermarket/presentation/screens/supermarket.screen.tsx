@@ -64,7 +64,7 @@ export default function SupermarketScreen() {
   const clearError = useShoppingListStore((s) => s.clearError);
 
   const [category, setCategory] = useState<ProductCategory>('COMIDA');
-  const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [showSavedListsModal, setShowSavedListsModal] = useState(false);
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);

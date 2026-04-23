@@ -179,7 +179,7 @@ export default function DebtDetailScreen() {
         {/* Back + Actions */}
         <View style={styles.topBar}>
           <AppPressable
-            onPress={() => router.back()}
+            onPress={() => router.navigate('/(tabs)/debts')}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
             <ArrowLeft size={24} color={colors.text} pointerEvents='none' />

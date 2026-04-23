@@ -164,7 +164,7 @@ export default function DebtsScreen() {
           {
             backgroundColor:
               activeTab === 'collections' ? colors.success : colors.danger,
-            bottom: insets.bottom,
+            bottom: insets.bottom + 20,
           },
         ]}
       >

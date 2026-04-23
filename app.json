@@ -17,16 +17,12 @@
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "Kashy usa tu ubicacion para completar automaticamente tu ciudad y mejorar tu experiencia en la app.",
-        "UIBackgroundModes": ["remote-notification"],
-        "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true
-        }
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
       "package": "com.anonymous.kashy",
       "permissions": ["POST_NOTIFICATIONS"],
-      "usesCleartextTraffic": true,
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#63E696",
