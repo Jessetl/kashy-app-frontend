@@ -1,7 +1,7 @@
-import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
 import { useCountry } from '@/shared/presentation/hooks/use-country';
+import { parsePriceInput } from '@/shared/presentation/utils/parse-price-input';
 import { Check, Plus, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
@@ -12,6 +12,9 @@ interface AddProductFormProps {
   initialName?: string;
   initialPrice?: string;
   priceInLocal?: boolean;
+  usdToLocal: (usd: number) => number;
+  localToUsd: (local: number) => number;
+  isExchangeRateAvailable: boolean;
 }
 
 export const AddProductForm = React.memo(function AddProductForm({
@@ -20,10 +23,12 @@ export const AddProductForm = React.memo(function AddProductForm({
   initialName,
   initialPrice,
   priceInLocal = false,
+  usdToLocal,
+  localToUsd,
+  isExchangeRateAvailable,
 }: AddProductFormProps) {
   const colors = useThemeColors();
   const { country } = useCountry();
-  const { usdToLocal, localToUsd } = useExchangeRate();
   const [productName, setProductName] = useState(initialName ?? '');
   const [price, setPrice] = useState(initialPrice ?? '');
   const priceRef = useRef<TextInput>(null);
@@ -54,8 +59,8 @@ export const AddProductForm = React.memo(function AddProductForm({
     }
 
     setPrice((current) => {
-      const numeric = parseFloat(current.replace(',', '.'));
-      if (!Number.isFinite(numeric) || numeric <= 0) {
+      const numeric = parsePriceInput(current);
+      if (numeric == null || numeric <= 0) {
         return '';
       }
       // wasLocal=true & now USD → convert local→USD
@@ -70,13 +75,19 @@ export const AddProductForm = React.memo(function AddProductForm({
 
   const handleAdd = useCallback(() => {
     const trimmedName = productName.trim();
-    const numPrice = parseFloat(price.replace(',', '.'));
+    const numPrice = parsePriceInput(price);
 
-    if (!trimmedName || isNaN(numPrice) || numPrice <= 0) {
+    if (!trimmedName || numPrice == null || numPrice <= 0) {
       return;
     }
 
-    const localPrice = priceInLocal ? numPrice : usdToLocal(numPrice);
+    const safePrice = numPrice;
+
+    if (!priceInLocal && !isExchangeRateAvailable) {
+      return;
+    }
+
+    const localPrice = priceInLocal ? safePrice : usdToLocal(safePrice);
 
     if (localPrice <= 0) {
       return;
@@ -85,7 +96,14 @@ export const AddProductForm = React.memo(function AddProductForm({
     onAdd(trimmedName, parseFloat(localPrice.toFixed(2)));
     setProductName('');
     setPrice('');
-  }, [productName, price, priceInLocal, usdToLocal, onAdd]);
+  }, [
+    productName,
+    price,
+    priceInLocal,
+    isExchangeRateAvailable,
+    usdToLocal,
+    onAdd,
+  ]);
 
   const handlePriceChange = useCallback((text: string) => {
     const cleaned = text.replace(/[^0-9.,]/g, '');
@@ -95,7 +113,8 @@ export const AddProductForm = React.memo(function AddProductForm({
   const isValid =
     productName.trim().length > 0 &&
     price.length > 0 &&
-    parseFloat(price.replace(',', '.')) > 0;
+    (parsePriceInput(price) ?? 0) > 0 &&
+    (priceInLocal || isExchangeRateAvailable);
 
   const pricePlaceholder = priceInLocal ? country.currency : 'USD';
 

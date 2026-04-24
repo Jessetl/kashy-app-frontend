@@ -9,19 +9,29 @@ import { useLocationStore } from '@/shared/infrastructure/location/location.stor
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
-
+import { Platform } from 'react-native';
 import { GoogleAuthUseCase } from '../../application/google-auth.use-case';
 import { AuthDatasource } from '../../infrastructure/auth.datasource';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// IDs de cliente de Google — configura los tuyos en las variables de entorno
-// EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID, EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID, EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID
+// IDs de cliente de Google — puedes sobreescribirlos con EXPO_PUBLIC_GOOGLE_*.
 const GOOGLE_CONFIG = {
   androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
   iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
-};
+} as const;
+
+function getGoogleNativeScheme(clientId?: string): string | undefined {
+  if (!clientId) {
+    return undefined;
+  }
+
+  return `com.googleusercontent.apps.${clientId.replace(
+    '.apps.googleusercontent.com',
+    '',
+  )}`;
+}
 
 const googleAuthUseCase = new GoogleAuthUseCase(new AuthDatasource());
 
@@ -58,8 +68,29 @@ export function useGoogleAuth({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [, response, promptAsyncInternal] =
-    Google.useAuthRequest(GOOGLE_CONFIG);
+  const androidRedirectScheme = getGoogleNativeScheme(
+    GOOGLE_CONFIG.androidClientId,
+  );
+  const iosRedirectScheme = getGoogleNativeScheme(GOOGLE_CONFIG.iosClientId);
+
+  const redirectUri =
+    Platform.OS === 'android' && androidRedirectScheme
+      ? `${androidRedirectScheme}:/oauthredirect`
+      : Platform.OS === 'ios' && iosRedirectScheme
+        ? `${iosRedirectScheme}:/oauthredirect`
+        : undefined;
+
+  const authRequestConfig = {
+    ...GOOGLE_CONFIG,
+    redirectUri,
+  };
+
+  const [, response, promptAsyncInternal] = Google.useAuthRequest(
+    authRequestConfig,
+    {
+      scheme: 'kashy',
+    },
+  );
 
   const clearError = useCallback(() => setError(null), []);
 
@@ -69,17 +100,26 @@ export function useGoogleAuth({
     }
 
     const { authentication } = response;
-    if (!authentication) return;
+    if (!authentication) {
+      return;
+    }
 
     const resolvedCountry = country ?? storedCountry ?? DEFAULT_COUNTRY_CODE;
+    const { idToken, accessToken } = authentication;
 
     setIsLoading(true);
     setError(null);
 
-    googleAuthUseCase
+    if (!idToken || !accessToken) {
+      setError('No se recibieron tokens de Google');
+      setIsLoading(false);
+      return;
+    }
+
+    void googleAuthUseCase
       .execute({
-        idToken: authentication.idToken ?? null,
-        accessToken: authentication.accessToken ?? null,
+        idToken,
+        accessToken,
         country: resolvedCountry,
         locationLatitude: coords?.latitude ?? 0,
         locationLongitude: coords?.longitude ?? 0,
@@ -90,15 +130,32 @@ export function useGoogleAuth({
         onSuccess?.();
       })
       .catch((err: unknown) => {
+        console.log({ err });
         setError(getGoogleAuthErrorMessage(err));
       })
       .finally(() => {
         setIsLoading(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [response]);
+  }, [
+    response,
+    country,
+    storedCountry,
+    setCountry,
+    setSession,
+    onSuccess,
+    coords,
+  ]);
 
   const promptAsync = useCallback(() => {
+    if (
+      !GOOGLE_CONFIG.androidClientId ||
+      !GOOGLE_CONFIG.iosClientId ||
+      !GOOGLE_CONFIG.webClientId
+    ) {
+      setError('Configuracion de Google incompleta.');
+      return;
+    }
+
     setError(null);
     void promptAsyncInternal();
   }, [promptAsyncInternal]);

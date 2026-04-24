@@ -103,13 +103,15 @@ const flushPendingSyncs = async (
 
   for (const [itemId, pending] of itemEntries) {
     tasks.push(
-      datasource.updateItem(pending.listId, itemId, pending.data).catch((err) => {
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'No se pudo sincronizar el producto';
-        onError(message);
-      }),
+      datasource
+        .updateItem(pending.listId, itemId, pending.data)
+        .catch((err) => {
+          const message =
+            err instanceof Error
+              ? err.message
+              : 'No se pudo sincronizar el producto';
+          onError(message);
+        }),
     );
   }
 
@@ -410,11 +412,8 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
     // 3. Debounce the API sync so rapid +/- clicks batch into one request
     //    with the final quantity.
     if (shouldSyncToApi(activeList.id)) {
-      scheduleItemApiSync(
-        activeList.id,
-        itemId,
-        { quantity },
-        (msg) => set({ error: msg }),
+      scheduleItemApiSync(activeList.id, itemId, { quantity }, (msg) =>
+        set({ error: msg }),
       );
     }
   },
@@ -481,11 +480,8 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
 
     // 3. Debounce the API sync so rapid edits to price/name/qty coalesce.
     if (shouldSyncToApi(activeList.id)) {
-      scheduleItemApiSync(
-        activeList.id,
-        itemId,
-        data,
-        (msg) => set({ error: msg }),
+      scheduleItemApiSync(activeList.id, itemId, data, (msg) =>
+        set({ error: msg }),
       );
     }
   },
@@ -569,9 +565,7 @@ export const useShoppingListStore = create<ShoppingListState>()((set, get) => ({
     set((state) => {
       if (!state.activeList) return state;
       const updatedItems = state.activeList.items.map((item) =>
-        item.id === itemId
-          ? { ...item, isPurchased: !item.isPurchased }
-          : item,
+        item.id === itemId ? { ...item, isPurchased: !item.isPurchased } : item,
       );
       const updatedList = { ...state.activeList, items: updatedItems };
       return {
