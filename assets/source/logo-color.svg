@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- K simple con palitos cortos. Colores de la app. -->
+  <!-- Stem vertical -->
+  <rect x="360" y="332" width="110" height="360" fill="#E8E8E8"/>
+  <!-- Brazo superior (gris claro) -->
+  <path d="M 470 512 L 640 360" stroke="#E8E8E8" stroke-width="95" stroke-linecap="butt"/>
+  <!-- Brazo inferior (verde acento) -->
+  <path d="M 470 512 L 640 664" stroke="#63E696" stroke-width="95" stroke-linecap="butt"/>
+</svg>

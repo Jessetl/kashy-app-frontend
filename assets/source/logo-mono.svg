@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Variante mono (para favicon/notificaciones) -->
+  <rect x="360" y="332" width="110" height="360" fill="#FFFFFF"/>
+  <path d="M 470 512 L 640 360" stroke="#FFFFFF" stroke-width="95" stroke-linecap="butt"/>
+  <path d="M 470 512 L 640 664" stroke="#FFFFFF" stroke-width="95" stroke-linecap="butt"/>
+</svg>
