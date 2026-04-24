@@ -6,6 +6,7 @@ import {
 } from '@/shared/infrastructure/country/country.constants';
 import { useCountryStore } from '@/shared/infrastructure/country/country.store';
 import { useLocationStore } from '@/shared/infrastructure/location/location.store';
+import auth from '@react-native-firebase/auth';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
@@ -71,6 +72,7 @@ export function useGoogleAuth({
   const androidRedirectScheme = getGoogleNativeScheme(
     GOOGLE_CONFIG.androidClientId,
   );
+
   const iosRedirectScheme = getGoogleNativeScheme(GOOGLE_CONFIG.iosClientId);
 
   const redirectUri =
@@ -116,21 +118,26 @@ export function useGoogleAuth({
       return;
     }
 
-    void googleAuthUseCase
-      .execute({
-        idToken,
-        accessToken,
-        country: resolvedCountry,
-        locationLatitude: coords?.latitude ?? 0,
-        locationLongitude: coords?.longitude ?? 0,
-      })
+    void auth()
+      .signInWithCredential(
+        auth.GoogleAuthProvider.credential(idToken, accessToken),
+      )
+      .then((credential) => credential.user.getIdToken(true))
+      .then((firebaseIdToken) =>
+        googleAuthUseCase.execute({
+          idToken: firebaseIdToken,
+          accessToken,
+          country: resolvedCountry,
+          locationLatitude: coords?.latitude ?? 0,
+          locationLongitude: coords?.longitude ?? 0,
+        }),
+      )
       .then((session) => {
         setCountry(resolvedCountry);
         setSession(session);
         onSuccess?.();
       })
       .catch((err: unknown) => {
-        console.log({ err });
         setError(getGoogleAuthErrorMessage(err));
       })
       .finally(() => {
