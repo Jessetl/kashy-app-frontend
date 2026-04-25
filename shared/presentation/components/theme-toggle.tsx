@@ -67,7 +67,7 @@ export const ThemeToggle = React.memo(function ThemeToggle() {
         rotate: `${interpolate(
           rotation.value,
           [0, 1],
-          [0, 180],
+          [0, 225],
           Extrapolation.CLAMP,
         )}deg`,
       },

@@ -5,10 +5,12 @@ import React, { useCallback, useEffect } from 'react';
 import {
   Dimensions,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
+  TextInput,
   View,
+  type KeyboardEvent,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
@@ -24,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const DISMISS_THRESHOLD = 150;
+const KEYBOARD_CLEARANCE = 32;
 
 interface BottomSheetModalProps {
   /** Si el modal está visible */
@@ -54,6 +57,7 @@ export const BottomSheetModal = React.memo(function BottomSheetModal({
 
   const translateY = useSharedValue(modalHeight);
   const backdropOpacity = useSharedValue(0);
+  const keyboardOffset = useSharedValue(0);
 
   const dismiss = useCallback(() => {
     Keyboard.dismiss();
@@ -76,6 +80,52 @@ export const BottomSheetModal = React.memo(function BottomSheetModal({
     }
   }, [visible, translateY, backdropOpacity]);
 
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    const showEvent =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const onShow = (event: KeyboardEvent) => {
+      const keyboardHeight = event.endCoordinates?.height ?? 0;
+      const duration = event.duration ?? 250;
+      const keyboardTop = SCREEN_HEIGHT - keyboardHeight;
+      const PADDING = 16;
+
+      const focusedInput = TextInput.State.currentlyFocusedInput();
+
+      if (!focusedInput) {
+        keyboardOffset.value = withTiming(0, { duration });
+        return;
+      }
+
+      focusedInput.measureInWindow((_x, y, _w, height) => {
+        const inputBottom = y + height;
+        const overlap = inputBottom - keyboardTop;
+        const offset =
+          overlap > 0 ? -(overlap + PADDING + KEYBOARD_CLEARANCE) : 0;
+        keyboardOffset.value = withTiming(offset, { duration });
+      });
+    };
+
+    const onHide = (event: KeyboardEvent) => {
+      const duration = event.duration ?? 250;
+      keyboardOffset.value = withTiming(0, { duration });
+    };
+
+    const showSub = Keyboard.addListener(showEvent, onShow);
+    const hideSub = Keyboard.addListener(hideEvent, onHide);
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, [visible, keyboardOffset]);
+
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       if (event.translationY > 0) {
@@ -96,7 +146,7 @@ export const BottomSheetModal = React.memo(function BottomSheetModal({
     });
 
   const animatedModalStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
+    transform: [{ translateY: translateY.value + keyboardOffset.value }],
   }));
 
   const animatedBackdropStyle = useAnimatedStyle(() => ({
@@ -132,44 +182,46 @@ export const BottomSheetModal = React.memo(function BottomSheetModal({
           animatedModalStyle,
         ]}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.flex}
-        >
-          <View style={styles.content}>
-            {/* Drag Handle — only this area listens to the dismiss-by-drag
-                gesture, so any ScrollView/FlatList rendered as children can
-                scroll freely without competing with the sheet's pan. */}
-            <GestureDetector gesture={panGesture}>
-              <View style={styles.handleContainer}>
-                <View
-                  style={[styles.handle, { backgroundColor: colors.border }]}
-                />
-              </View>
-            </GestureDetector>
+        <View style={styles.flex}>
+          {/* Drag Handle — only this area listens to the dismiss-by-drag
+              gesture, so any ScrollView/FlatList rendered as children can
+              scroll freely without competing with the sheet's pan. */}
+          <GestureDetector gesture={panGesture}>
+            <View style={styles.handleContainer}>
+              <View
+                style={[styles.handle, { backgroundColor: colors.border }]}
+              />
+            </View>
+          </GestureDetector>
 
-            {/* Close Button */}
-            {showCloseButton && (
-              <AppPressable
-                onPress={dismiss}
-                style={[
-                  styles.closeButton,
-                  { backgroundColor: colors.backgroundTertiary },
-                ]}
-                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-              >
-                <X
-                  pointerEvents='none'
-                  size={20}
-                  color={colors.textOnSurface}
-                  strokeWidth={2.5}
-                />
-              </AppPressable>
-            )}
+          {/* Close Button */}
+          {showCloseButton && (
+            <AppPressable
+              onPress={dismiss}
+              style={[
+                styles.closeButton,
+                { backgroundColor: colors.backgroundTertiary },
+              ]}
+              hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            >
+              <X
+                pointerEvents='none'
+                size={20}
+                color={colors.textOnSurface}
+                strokeWidth={2.5}
+              />
+            </AppPressable>
+          )}
 
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.content}
+            keyboardShouldPersistTaps='handled'
+            showsVerticalScrollIndicator={false}
+          >
             {children}
-          </View>
-        </KeyboardAvoidingView>
+          </ScrollView>
+        </View>
       </Animated.View>
     </View>
   );
@@ -193,8 +245,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
     paddingHorizontal: 24,
+    paddingBottom: 24,
+    flexGrow: 1,
   },
   handleContainer: {
     alignItems: 'center',
