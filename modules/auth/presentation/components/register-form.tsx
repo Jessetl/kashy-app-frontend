@@ -2,7 +2,7 @@ import {
   COUNTRIES,
   DEFAULT_COUNTRY_CODE,
   type CountryCode,
-} from '@/shared/infrastructure/country/country.constants';
+} from '@/shared/domain/country/country.constants';
 import { useCountryStore } from '@/shared/infrastructure/country/country.store';
 import {
   AppButton,

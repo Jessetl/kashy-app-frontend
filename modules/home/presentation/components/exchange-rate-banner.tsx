@@ -1,4 +1,4 @@
-import { COUNTRIES } from '@/shared/infrastructure/country/country.constants';
+import { COUNTRIES } from '@/shared/domain/country/country.constants';
 import { useCountryStore } from '@/shared/infrastructure/country/country.store';
 import { AppPressable } from '@/shared/presentation/components/ui';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';

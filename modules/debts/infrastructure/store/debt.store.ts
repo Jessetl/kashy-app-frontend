@@ -38,6 +38,12 @@ interface DebtState {
   updateDebt: (id: string, data: UpdateDebtInput) => Promise<void>;
   deleteDebt: (id: string) => Promise<void>;
   markAsPaid: (id: string) => Promise<void>;
+  /**
+   * Obtiene una deuda puntual. Primero consulta la cache in-memory del store
+   * (debts + summaryDebts); si no está, pide al datasource. Evita que las
+   * pantallas de detalle tengan que instanciar datasources directamente.
+   */
+  getDebtById: (id: string) => Promise<Debt>;
   clearError: () => void;
   resetStore: () => void;
 }
@@ -172,6 +178,15 @@ export const useDebtStore = create<DebtState>()((set, get) => ({
       set({ error: message });
       throw err;
     }
+  },
+
+  getDebtById: async (id) => {
+    const state = get();
+    const cached =
+      state.debts.find((d) => d.id === id) ??
+      state.summaryDebts.find((d) => d.id === id);
+    if (cached) return cached;
+    return datasource.getDebtById(id);
   },
 
   markAsPaid: async (id) => {

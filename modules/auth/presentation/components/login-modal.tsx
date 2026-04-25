@@ -56,7 +56,11 @@ export const LoginModal = React.memo(function LoginModal({
   }, [clearError, reset]);
 
   const handleSocialLogin = useCallback((provider: string) => {
-    console.log(`[Auth] Inicio de sesión con ${provider}`);
+    // Placeholder — el flujo real de social login se dispara desde los
+    // botones de Google/Apple. Este callback queda reservado por compat.
+    if (__DEV__) {
+      console.log(`[Auth] Inicio de sesión con ${provider}`);
+    }
   }, []);
 
   return (

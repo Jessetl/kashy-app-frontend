@@ -1,9 +1,9 @@
-import { ApiHttpError } from '@/shared/infrastructure/api';
-import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import {
   DEFAULT_COUNTRY_CODE,
   type CountryCode,
-} from '@/shared/infrastructure/country/country.constants';
+} from '@/shared/domain/country/country.constants';
+import { ApiHttpError } from '@/shared/infrastructure/api';
+import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { useCountryStore } from '@/shared/infrastructure/country/country.store';
 import { useLocationStore } from '@/shared/infrastructure/location/location.store';
 import auth from '@react-native-firebase/auth';
@@ -11,8 +11,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { GoogleAuthUseCase } from '../../application/google-auth.use-case';
-import { AuthDatasource } from '../../infrastructure/auth.datasource';
+import { googleAuthUseCase } from '../../composition';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -22,28 +21,6 @@ const GOOGLE_CONFIG = {
   iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
 } as const;
-
-function getGoogleNativeScheme(clientId?: string): string | undefined {
-  if (!clientId) {
-    return undefined;
-  }
-
-  return `com.googleusercontent.apps.${clientId.replace(
-    '.apps.googleusercontent.com',
-    '',
-  )}`;
-}
-
-const googleAuthUseCase = new GoogleAuthUseCase(new AuthDatasource());
-
-function getGoogleAuthErrorMessage(err: unknown): string {
-  if (err instanceof ApiHttpError) {
-    return err.message;
-  }
-  return err instanceof Error
-    ? err.message
-    : 'Error al autenticarse con Google';
-}
 
 interface UseGoogleAuthOptions {
   country?: CountryCode;
@@ -56,6 +33,26 @@ interface UseGoogleAuthReturn {
   error: string | null;
   clearError: () => void;
 }
+
+const getGoogleNativeScheme = (clientId?: string): string | undefined => {
+  if (!clientId) {
+    return undefined;
+  }
+
+  return `com.googleusercontent.apps.${clientId.replace(
+    '.apps.googleusercontent.com',
+    '',
+  )}`;
+};
+
+const getGoogleAuthErrorMessage = (err: unknown): string => {
+  if (err instanceof ApiHttpError) {
+    return err.message;
+  }
+  return err instanceof Error
+    ? err.message
+    : 'Error al autenticarse con Google';
+};
 
 export function useGoogleAuth({
   country,
@@ -72,7 +69,6 @@ export function useGoogleAuth({
   const androidRedirectScheme = getGoogleNativeScheme(
     GOOGLE_CONFIG.androidClientId,
   );
-
   const iosRedirectScheme = getGoogleNativeScheme(GOOGLE_CONFIG.iosClientId);
 
   const redirectUri =
@@ -82,13 +78,11 @@ export function useGoogleAuth({
         ? `${iosRedirectScheme}:/oauthredirect`
         : undefined;
 
-  const authRequestConfig = {
-    ...GOOGLE_CONFIG,
-    redirectUri,
-  };
-
   const [, response, promptAsyncInternal] = Google.useAuthRequest(
-    authRequestConfig,
+    {
+      ...GOOGLE_CONFIG,
+      redirectUri,
+    },
     {
       scheme: 'kashy',
     },

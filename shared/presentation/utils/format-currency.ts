@@ -1,4 +1,4 @@
-import type { CountryConfig } from '@/shared/infrastructure/country/country.constants';
+import type { CountryConfig } from '@/shared/domain/country/country.constants';
 
 const cache = new Map<string, Intl.NumberFormat>();
 

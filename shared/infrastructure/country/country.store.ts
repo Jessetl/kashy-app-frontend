@@ -1,11 +1,11 @@
-import { create } from 'zustand';
-import { secureStorage } from '../storage/app-storage';
 import {
   DEFAULT_COUNTRY_CODE,
   getCountryConfig,
   type CountryCode,
   type CountryConfig,
-} from './country.constants';
+} from '@/shared/domain/country/country.constants';
+import { create } from 'zustand';
+import { secureStorage } from '../storage/app-storage';
 
 const COUNTRY_STORAGE_KEY = 'selected-country';
 

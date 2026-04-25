@@ -2,10 +2,7 @@ import { ApiHttpError } from '@/shared/infrastructure/api';
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { useEffect, useRef } from 'react';
 
-import { RefreshTokenUseCase } from '../../application/refresh-token.use-case';
-import { AuthDatasource } from '../../infrastructure/auth.datasource';
-
-const refreshUseCase = new RefreshTokenUseCase(new AuthDatasource());
+import { refreshTokenUseCase } from '../../composition';
 
 /**
  * Hook que restaura la sesión al montar la app.
@@ -41,10 +38,12 @@ export function useSessionRestore(): void {
       }
 
       try {
-        const newTokens = await refreshUseCase.execute(refreshToken);
+        const newTokens = await refreshTokenUseCase.execute(refreshToken);
         updateTokens(newTokens);
       } catch (err) {
-        console.log('[SessionRestore] Error al restaurar sesión', err);
+        if (__DEV__) {
+          console.warn('[SessionRestore] Error al restaurar sesión', err);
+        }
         if (!(err instanceof ApiHttpError)) {
           // Error de red/parseo: mantener sesión local y reintentar en próximas requests.
           return;

@@ -7,6 +7,9 @@ import type {
 } from '../../domain/entities/shopping-list.entity';
 import type { ShoppingListPort } from '../../domain/ports/shopping-list.port';
 
+// Regla irrompible #4: los montos no se redondean antes de mostrarlos.
+// Enviamos los valores con precisión completa; el redondeo ocurre solo
+// en utilidades de formato en la capa de presentación.
 function mapItemToApi(
   input: CreateShoppingItemInput & { isPurchased?: boolean },
 ) {
@@ -14,8 +17,8 @@ function mapItemToApi(
     productName: input.productName,
     quantity: input.quantity,
     category: input.category,
-    unitPriceLocal: parseFloat(input.unitPriceLocal.toFixed(2)),
-    unitPriceUsd: parseFloat((input.unitPriceUsd || 0)?.toFixed(2)),
+    unitPriceLocal: input.unitPriceLocal,
+    unitPriceUsd: input.unitPriceUsd ?? 0,
     ...(input.isPurchased !== undefined && { isPurchased: input.isPurchased }),
   };
 }

@@ -1,4 +1,4 @@
-import { useNotifications } from '@/modules/notifications/presentation/hooks/use-notifications';
+import { useNotifications } from '@/modules/notifications';
 import { NotificationButton } from '@/shared/presentation/components/notification-button';
 import { ThemeToggle } from '@/shared/presentation/components/theme-toggle';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';

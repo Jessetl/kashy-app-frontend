@@ -2,9 +2,8 @@ import { ApiHttpError } from '@/shared/infrastructure/api';
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { useCallback, useState } from 'react';
 
-import { LoginUseCase } from '../../application/login.use-case';
+import { loginUseCase } from '../../composition';
 import type { LoginCredentials } from '../../domain/auth.entity';
-import { AuthDatasource } from '../../infrastructure/auth.datasource';
 
 interface UseLoginReturn {
   isLoading: boolean;
@@ -12,8 +11,6 @@ interface UseLoginReturn {
   submitLogin: (credentials: LoginCredentials) => Promise<void>;
   clearError: () => void;
 }
-
-const loginUseCase = new LoginUseCase(new AuthDatasource());
 
 function getLoginErrorMessage(err: unknown): string {
   if (err instanceof ApiHttpError) {

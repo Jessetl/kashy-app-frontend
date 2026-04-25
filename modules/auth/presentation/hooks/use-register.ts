@@ -2,14 +2,13 @@ import { ApiHttpError } from '@/shared/infrastructure/api';
 import {
   DEFAULT_COUNTRY_CODE,
   type CountryCode,
-} from '@/shared/infrastructure/country/country.constants';
+} from '@/shared/domain/country/country.constants';
 import { useCountryStore } from '@/shared/infrastructure/country/country.store';
 import { useLocationStore } from '@/shared/infrastructure/location/location.store';
 import { useCallback, useState } from 'react';
 
-import { RegisterUseCase } from '../../application/register.use-case';
+import { registerUseCase } from '../../composition';
 import type { RegisterCredentials } from '../../domain/auth.entity';
-import { AuthDatasource } from '../../infrastructure/auth.datasource';
 
 export interface RegisterFormValues {
   email: string;
@@ -26,8 +25,6 @@ interface UseRegisterReturn {
   submitRegister: (values: RegisterFormValues) => Promise<void>;
   clearError: () => void;
 }
-
-const registerUseCase = new RegisterUseCase(new AuthDatasource());
 
 function getRegisterErrorMessage(err: unknown): string {
   if (err instanceof ApiHttpError) {

@@ -90,6 +90,7 @@
           "ios": { "useFrameworks": "static" }
         }
       ],
+      "./plugins/with-google-oauth-intent-filter.js",
       "./plugins/with-notifee-maven-repo.js",
       "./plugins/with-notification-icon.js",
       "./plugins/with-firebase-ios-configure.js"

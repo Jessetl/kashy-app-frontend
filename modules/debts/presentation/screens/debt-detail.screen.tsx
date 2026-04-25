@@ -21,19 +21,17 @@ import {
   MinusCircle,
   Trash2,
 } from 'lucide-react-native';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { Debt, DebtPriority } from '../../domain/entities/debt.entity';
+import type { DebtPriority } from '../../domain/entities/debt.entity';
 import {
   calculateTotalWithInterest,
   isOverdue,
 } from '../../domain/entities/debt.entity';
-import { DebtDatasource } from '../../infrastructure/datasources/debt.datasource';
 import { useDebtStore } from '../../infrastructure/store/debt.store';
 import { DebtForm } from '../components/debt-form';
-
-const datasource = new DebtDatasource();
+import { useDebtById } from '../hooks/use-debt-by-id';
 
 const PRIORITY_CONFIG: Record<
   DebtPriority,
@@ -52,30 +50,23 @@ export default function DebtDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { rate } = useExchangeRate();
 
-  const [debt, setDebt] = useState<Debt | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const {
+    debt,
+    isLoading,
+    error: loadError,
+    reload: loadDebt,
+    patch: patchDebt,
+  } = useDebtById(id);
   const [showEditForm, setShowEditForm] = useState(false);
 
   const markAsPaid = useDebtStore((s) => s.markAsPaid);
   const deleteDebt = useDebtStore((s) => s.deleteDebt);
 
-  const loadDebt = useCallback(async () => {
-    if (!id) return;
-    try {
-      setIsLoading(true);
-      const data = await datasource.getDebtById(id);
-      setDebt(data);
-    } catch {
-      Alert.alert('Error', 'No se pudo cargar la deuda');
-      router.back();
-    } finally {
-      setIsLoading(false);
-    }
-  }, [id, router]);
-
-  useEffect(() => {
-    void loadDebt();
-  }, [loadDebt]);
+  // Si la carga falla de forma permanente, muestra el error y vuelve atrás.
+  if (loadError && !debt && !isLoading) {
+    Alert.alert('Error', 'No se pudo cargar la deuda');
+    router.back();
+  }
 
   const handleMarkAsPaid = useCallback(() => {
     if (!debt) return;
@@ -92,7 +83,7 @@ export default function DebtDetailScreen() {
           onPress: async () => {
             try {
               await markAsPaid(debt.id);
-              setDebt((prev) => (prev ? { ...prev, isPaid: true } : prev));
+              patchDebt({ isPaid: true });
             } catch (err) {
               const message =
                 err instanceof Error
@@ -104,7 +95,7 @@ export default function DebtDetailScreen() {
         },
       ],
     );
-  }, [debt, markAsPaid]);
+  }, [debt, markAsPaid, patchDebt]);
 
   const handleDelete = useCallback(() => {
     if (!debt) return;

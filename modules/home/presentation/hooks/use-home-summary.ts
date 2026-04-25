@@ -1,14 +1,14 @@
-import type { Debt } from '@/modules/debts/domain/entities/debt.entity';
 import {
   calculateTotalWithInterest,
   isOverdue,
-} from '@/modules/debts/domain/entities/debt.entity';
-import { useDebtStore } from '@/modules/debts/infrastructure/store/debt.store';
-import { useExchangeRate } from '@/modules/shared-services/exchange-rate/presentation/use-exchange-rate';
-import { useShoppingListStore } from '@/modules/supermarket/infrastructure/store/shopping-list.store';
+  useSummaryDebts,
+  type Debt,
+} from '@/modules/debts';
+import { useExchangeRate } from '@/modules/shared-services/exchange-rate';
+import { useShoppingListsSummary } from '@/modules/supermarket';
 import { localDateToMs } from '@/shared/domain/date/local-date';
 import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 
 export interface HomeSummary {
   // Auth
@@ -45,23 +45,12 @@ export function useHomeSummary(): HomeSummary {
     isLoading: isRateLoading,
     reload: reloadRate,
   } = useExchangeRate();
-  const didInit = useRef(false);
 
-  // Debt store selectors
-  const allDebts = useDebtStore((s) => s.summaryDebts);
-  const loadSummaryDebts = useDebtStore((s) => s.loadSummaryDebts);
+  // API pública del módulo debts (carga automática al montar si hay sesión).
+  const allDebts = useSummaryDebts();
 
-  // Shopping store selectors
-  const activeList = useShoppingListStore((s) => s.activeList);
-
-  // Load all debts (both types) on mount for accurate summary totals
-  useEffect(() => {
-    if (didInit.current) return;
-    didInit.current = true;
-    if (isAuthenticated) {
-      void loadSummaryDebts();
-    }
-  }, [isAuthenticated, loadSummaryDebts]);
+  // API pública del módulo supermarket.
+  const { activeList } = useShoppingListsSummary();
 
   // User info
   const displayName = (isAuthenticated && user?.firstName) || 'Invitado';
@@ -114,10 +103,9 @@ export function useHomeSummary(): HomeSummary {
 
   const reload = useCallback(() => {
     void reloadRate();
-    if (isAuthenticated) {
-      void loadSummaryDebts();
-    }
-  }, [reloadRate, isAuthenticated, loadSummaryDebts]);
+    // La recarga de debts la gestiona internamente `useSummaryDebts`
+    // cuando cambia la sesión; aquí sólo refrescamos la tasa.
+  }, [reloadRate]);
 
   return {
     isAuthenticated,

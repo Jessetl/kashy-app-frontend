@@ -1,5 +1,8 @@
-import { useDebtStore } from '@/modules/debts/infrastructure/store/debt.store';
-import { useShoppingListStore } from '@/modules/supermarket/infrastructure/store/shopping-list.store';
+// Imports directos al hook de reset (no al barrel) para evitar el ciclo:
+// `use-auth` → `@/modules/debts` (barrel) → `useDebts` → `use-auth`.
+// Los hooks `use-reset-*` no tienen ninguna dependencia transitiva sobre auth.
+import { resetDebtsModule } from '@/modules/debts/presentation/hooks/use-reset-debts';
+import { resetSupermarketModule } from '@/modules/supermarket/presentation/hooks/use-reset-supermarket';
 import type { AuthUser } from '@/shared/domain/auth/auth.types';
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { useCallback } from 'react';
@@ -26,9 +29,10 @@ export function useAuth(): UseAuthReturn {
 
   const logout = useCallback(() => {
     clearSession();
-    // Limpiar datos de módulos para no filtrar datos entre usuarios
-    useShoppingListStore.getState().resetStore();
-    useDebtStore.getState().resetStore();
+    // Limpiar datos de módulos para no filtrar datos entre usuarios.
+    // Cada módulo expone su propio reset vía barrel público.
+    resetSupermarketModule();
+    resetDebtsModule();
   }, [clearSession]);
 
   return {

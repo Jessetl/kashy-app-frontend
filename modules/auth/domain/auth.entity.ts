@@ -1,15 +1,17 @@
+import type { CountryCode } from '@/shared/domain/country/country.constants';
+
 export type {
   AuthSession,
   AuthTokens,
   AuthUser,
 } from '@/shared/domain/auth/auth.types';
-export type { CountryCode } from '@/shared/infrastructure/country/country.constants';
+export type { CountryCode } from '@/shared/domain/country/country.constants';
 
 /** Datos para autenticación con Google (register o login unificado) */
 export interface GoogleAuthCredentials {
   idToken: string | null;
   accessToken: string | null;
-  country: import('@/shared/infrastructure/country/country.constants').CountryCode;
+  country: CountryCode;
   locationLatitude: number;
   locationLongitude: number;
 }

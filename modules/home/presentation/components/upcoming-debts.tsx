@@ -11,14 +11,12 @@ import {
   MinusCircle,
 } from 'lucide-react-native';
 
-import type {
-  Debt,
-  DebtPriority,
-} from '@/modules/debts/domain/entities/debt.entity';
 import {
   calculateTotalWithInterest,
   isOverdue,
-} from '@/modules/debts/domain/entities/debt.entity';
+  type Debt,
+  type DebtPriority,
+} from '@/modules/debts';
 import React, { useCallback } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 

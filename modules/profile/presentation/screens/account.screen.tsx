@@ -1,6 +1,3 @@
-import { apiClient } from '@/shared/infrastructure/api';
-import { ApiHttpError } from '@/shared/infrastructure/api/api-http-error';
-import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { CardShadow } from '@/shared/infrastructure/theme/theme.constants';
 import { AppButton } from '@/shared/presentation/components/ui/app-button';
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
@@ -8,6 +5,7 @@ import { AppTextInput } from '@/shared/presentation/components/ui/app-text-input
 import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { useRouter } from 'expo-router';
+import { useAccount } from '../hooks/use-account';
 import {
   ArrowLeft,
   Eye,
@@ -34,11 +32,17 @@ export default function AccountScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuth();
-  const updateUser = useAuthStore((s) => s.updateUser);
+  const {
+    isUpdatingProfile,
+    isChangingPassword,
+    updateProfile,
+    changePassword,
+    profileError,
+    passwordError,
+  } = useAccount();
 
   const [firstName, setFirstName] = useState(user?.firstName ?? '');
   const [lastName, setLastName] = useState(user?.lastName ?? '');
-  const [nameLoading, setNameLoading] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -46,7 +50,6 @@ export default function AccountScreen() {
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
 
   const nameChanged =
     firstName.trim() !== (user?.firstName ?? '') ||
@@ -62,52 +65,39 @@ export default function AccountScreen() {
 
   const handleSaveName = useCallback(async () => {
     if (!nameChanged) return;
-    setNameLoading(true);
-    try {
-      await apiClient('/users/me', {
-        method: 'PUT',
-        body: { firstName: firstName.trim(), lastName: lastName.trim() },
-      });
-      updateUser({ firstName: firstName.trim(), lastName: lastName.trim() });
+    const ok = await updateProfile({ firstName, lastName });
+    if (ok) {
       Alert.alert('Listo', 'Tu nombre se ha actualizado.');
-    } catch (error) {
-      const message =
-        error instanceof ApiHttpError
-          ? error.message
-          : 'No se pudo actualizar el nombre.';
-      Alert.alert('Error', message);
-    } finally {
-      setNameLoading(false);
+    } else if (profileError) {
+      Alert.alert('Error', profileError);
     }
-  }, [nameChanged, firstName, lastName, updateUser]);
+  }, [nameChanged, firstName, lastName, updateProfile, profileError]);
 
   const handleChangePassword = useCallback(async () => {
     if (!passwordValid) {
       Alert.alert('Error', 'La contraseña no cumple con los requisitos.');
       return;
     }
-    setPasswordLoading(true);
-    try {
-      await apiClient('/users/me/password', {
-        method: 'PUT',
-        body: { currentPassword, newPassword },
-      });
+    const ok = await changePassword({ currentPassword, newPassword });
+    if (ok) {
       Alert.alert(
         'Contraseña actualizada',
         'Tu contraseña se cambió exitosamente. Debes iniciar sesión nuevamente.',
         [{ text: 'Entendido', onPress: () => { logout(); router.dismissAll(); } }],
         { cancelable: false },
       );
-    } catch (error) {
-      const message =
-        error instanceof ApiHttpError
-          ? error.message
-          : 'No se pudo cambiar la contraseña.';
-      Alert.alert('Error', message);
-    } finally {
-      setPasswordLoading(false);
+    } else if (passwordError) {
+      Alert.alert('Error', passwordError);
     }
-  }, [passwordValid, currentPassword, newPassword, logout, router]);
+  }, [
+    passwordValid,
+    currentPassword,
+    newPassword,
+    changePassword,
+    passwordError,
+    logout,
+    router,
+  ]);
 
   return (
     <KeyboardAvoidingView
@@ -206,7 +196,7 @@ export default function AccountScreen() {
             <AppButton
               title='Guardar cambios'
               onPress={handleSaveName}
-              loading={nameLoading}
+              loading={isUpdatingProfile}
               disabled={!nameChanged}
             />
         </View>
@@ -290,7 +280,7 @@ export default function AccountScreen() {
             <AppButton
               title='Actualizar contraseña'
               onPress={handleChangePassword}
-              loading={passwordLoading}
+              loading={isChangingPassword}
               disabled={!passwordValid}
             />
         </View>
