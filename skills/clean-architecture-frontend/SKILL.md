@@ -96,60 +96,14 @@ export { default } from '@/modules/home/presentation/screens/home.screen';
 | **`references/layer-contracts.md`** | Contratos y ejemplos de código por artefacto: entity, value object, errors, port, DTO, mapper, use case, repository impl, datasource, hook, screen, thin wrapper. Incluye la tabla de convenciones de nomenclatura. |
 | **`references/patterns.md`** | Patrones compartidos (API Client, Result type), integración con Expo Router, flujo end-to-end UI → Hook → Use Case → Repo → API, y manejo de estado (TanStack Query, Zustand, React Hook Form, MMKV). |
 | **`references/anti-patterns.md`** | Los 5 errores más comunes con ejemplos: lógica en `app/`, fetch en componentes, reglas de negocio en hooks, imports cruzados entre módulos, god use case. |
-| **`evals/evals.json`** | Casos de prueba formales con expectations verificables. Los ejecuta el loop de `skill-creator` para medir adherencia cuantitativamente. |
 
 **Regla de consulta:** cuando el usuario te pida implementar un artefacto concreto (DTO, use case, hook…), lee `layer-contracts.md` antes de escribir el código. Cuando dude dónde va algo, lee `project-structure.md`.
 
 ---
 
-## Scaffolding — Generar un módulo nuevo
+## Reglas de Adherencia Arquitectónica
 
-Cuando el usuario pide "crea el módulo X", **prefiere ejecutar el scaffold** antes de escribir archivo por archivo. Crea la estructura correcta de inmediato y deja al dev solo rellenar los campos reales.
-
-```bash
-# desde la raíz del proyecto
-./skills/clean-architecture-frontend/scripts/scaffold-module.sh <nombre> \
-  [--complexity simple|medium|complex] \
-  [--action <verbo>] \
-  [--route "(tabs)/<ruta>"] \
-  [--dry-run]
-```
-
-**Ejemplos:**
-
-```bash
-# Módulo medio (default): entity, port, datasource, use-case, dto, hooks, screen
-./skills/clean-architecture-frontend/scripts/scaffold-module.sh debts --action create
-
-# Módulo complejo con ruta: agrega errors, mapper, store + wrapper en app/
-./skills/clean-architecture-frontend/scripts/scaffold-module.sh shopping-list \
-  --complexity complex --action create --route "(tabs)/shopping"
-
-# CRUD simple: solo datasource + hook + screen (sin use case)
-./skills/clean-architecture-frontend/scripts/scaffold-module.sh avatar --complexity simple
-```
-
-**Niveles de complejidad** (ver `Regla de Pragmatismo`):
-
-| Nivel     | Genera                                           | Cuándo usar                        |
-| --------- | ------------------------------------------------ | ---------------------------------- |
-| `simple`  | entity · port · datasource · hook-query · screen | CRUD puro, sin reglas de negocio   |
-| `medium`  | simple + use-case · dto · hook-mutation          | Lógica leve (login, listar)        |
-| `complex` | medium + errors · mapper · store                 | Reglas de negocio, múltiples flows |
-
-Los templates viven en `assets/templates/` y usan placeholders (`__MODULE__`, `__MODULE_PASCAL__`, `__ACTION__`, `__ACTION_PASCAL__`, `__MODULE_UPPER__`). Corre `--dry-run` primero para que el usuario vea qué se va a escribir.
-
-Tras generar, los siguientes pasos siempre son: (1) rellenar los campos de la entity, (2) definir los métodos reales en el port, (3) implementar el datasource contra el endpoint real, (4) conectar el hook con el screen, (5) añadir el re-export en `app/` si no usaste `--route`.
-
----
-
-## Linter — Validar adherencia arquitectónica
-
-Cuando el usuario termine un cambio grande (módulo nuevo, refactor, PR listo), **ejecuta el linter** antes de dar por cerrada la tarea. Convierte las reglas de dependencia en chequeo automatizado.
-
-```bash
-./skills/clean-architecture-frontend/scripts/validate-architecture.sh
-```
+Estas son las reglas de dependencia que debes respetar al escribir o revisar código. Verifícalas manualmente en cada cambio grande (módulo nuevo, refactor, PR listo).
 
 | Regla | Chequeo |
 | ----- | ------- |
@@ -159,15 +113,7 @@ Cuando el usuario termine un cambio grande (módulo nuevo, refactor, PR listo), 
 | **R4** | Un módulo no importa `@/modules/<otro>/...`. Distingue internals profundos (domain/application/infrastructure) de smells menores (presentation) |
 | **R5** | `fetch()` directo solo vive en `shared/infrastructure/api/` |
 
-Salida: reporta `file:line` + mensaje de cada violación. Exit 0 si limpio, 1 si hay violaciones. Flags: `--quiet`, `--no-r3`, `--no-r5`.
-
-**Cuándo ejecutar:**
-
-- Después de scaffoldear un módulo nuevo (detecta si pegaste código en el lugar equivocado).
-- Antes de cerrar un PR / marcar una tarea como completa.
-- Al refactorizar: mide si el cambio *reduce* el número de violaciones.
-
-Si el linter marca algo que en tu contexto es aceptable (ej. `@/modules/shared-services` cuando ese módulo está por moverse a `shared/`), documéntalo y planifica el refactor — **no silencies la violación**.
+Si detectas una violación que en tu contexto es aceptable (ej. `@/modules/shared-services` cuando ese módulo está por moverse a `shared/`), documéntalo y planifica el refactor — **no la ignores silenciosamente**.
 
 ---
 
@@ -181,7 +127,15 @@ Clean Architecture es una guía, no un dogma. Aplica proporcionalmente a la comp
 | **Medio** (lógica leve) | Hook + Use Case + Datasource                 | Login, listar productos     |
 | **Complejo** (reglas)   | Todas las capas con entities + value objects | Reservar, pagos, deudas     |
 
-La clave: **¿hay reglas de negocio que proteger?** Si sí, usa todas las capas. Si no, simplifica. El scaffold tiene un nivel para cada caso.
+La clave: **¿hay reglas de negocio que proteger?** Si sí, usa todas las capas. Si no, simplifica.
+
+**Niveles de complejidad recomendados:**
+
+| Nivel     | Capas a generar                                  | Cuándo usar                        |
+| --------- | ------------------------------------------------ | ---------------------------------- |
+| `simple`  | entity · port · datasource · hook-query · screen | CRUD puro, sin reglas de negocio   |
+| `medium`  | simple + use-case · dto · hook-mutation          | Lógica leve (login, listar)        |
+| `complex` | medium + errors · mapper · store                 | Reglas de negocio, múltiples flows |
 
 ---
 
@@ -218,4 +172,4 @@ Cuando el usuario solicite trabajo de arquitectura, estructura tu respuesta así
 6. **Notas de testing** — qué partes son testeables unitariamente y estructura de tests sugerida.
 7. **Delegación a UI** — archivos de `presentation/` que son responsabilidad de `rnr-ui-designer`, con props/hooks que recibirán.
 
-Para la mayoría de tareas, preferir `scaffold-module.sh` sobre escribir archivo por archivo, y cerrar con `validate-architecture.sh` para confirmar que no hay violaciones.
+Antes de cerrar la tarea, verifica manualmente las reglas R1–R5 de adherencia arquitectónica sobre los archivos que tocaste.

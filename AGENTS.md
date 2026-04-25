@@ -1,4 +1,4 @@
-# Kashy — Instrucciones para Claude
+# Kashy — Instrucciones para Agents
 
 ## Regla #0 — Lee ARCHITECTURE_MASTER.md Primero
 
@@ -32,7 +32,7 @@ Piensa en ti como el puente entre lo que el usuario pide, lo que el negocio nece
 
 ## Proyecto
 
-**Kashy** — App de gestion de compras de supermercado (VES/USD) + organizador de deudas/cobros con notificaciones. Mercado: Venezuela.
+**Kashy** — App de gestion de compras de supermercado (MONEDA_LOCAL/USD) + organizador de deudas/cobros con notificaciones. Mercado: Venezuela, Argentina, Chile, Colombia.
 
 React Native (Expo 54) + TypeScript 5.9 (strict) + Clean Architecture (4 capas: domain, application, infrastructure, presentation). Feature-first modular. Navegacion con Expo Router. UI con react-native-reusables (RNR) + NativeWind v4.
 
@@ -49,7 +49,7 @@ Backend: NestJS + PostgreSQL + Firebase Auth + RabbitMQ + FCM.
 - **`shared/` = codigo compartido** (2+ modulos lo usan). Componentes reutilizables, hooks globales, API client, stores globales.
 - **Sistema de modos**: toda accion que persista datos verifica `isAuthenticated` antes de llamar al API. Si es guest, dispara modal de login contextual (ver ARCHITECTURE_MASTER seccion 3).
 - **Datos guest**: solo en estado local (React state / MMKV temporal). NUNCA se envian al backend.
-- **Monedas**: precios se ingresan en VES, deudas se almacenan en USD. Conversiones con tasa vigente de `exchange_rates`.
+- **Monedas**: precios se ingresan en moneda local/USD, deudas se almacenan en USD. Conversiones con tasa vigente de `exchange_rates`.
 
 ## Skills
 
