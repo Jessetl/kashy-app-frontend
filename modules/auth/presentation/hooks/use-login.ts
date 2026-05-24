@@ -14,10 +14,9 @@ interface UseLoginReturn {
 
 function getLoginErrorMessage(err: unknown): string {
   if (err instanceof ApiHttpError) {
-    if (err.code === 'AUTH_INVALID_CREDENTIALS') {
-      return 'Correo o contraseña inválidos';
+    if (err.status === 401) {
+      return 'Correo o contraseña inválidos, o cuenta sin verificar';
     }
-
     return err.message;
   }
 
@@ -39,7 +38,6 @@ export function useLogin(onSuccess?: () => void): UseLoginReturn {
 
       try {
         const session = await loginUseCase.execute(credentials);
-        // Guardar sesión en store persistido
         setSession(session);
         onSuccess?.();
       } catch (err) {

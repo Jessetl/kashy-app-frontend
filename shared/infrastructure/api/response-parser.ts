@@ -1,4 +1,8 @@
-import type { ApiEnvelope, ApiErrorEnvelope } from '@/shared/infrastructure/api/api.types';
+import type {
+  ApiEnvelope,
+  ApiErrorEnvelope,
+  ApiErrorField,
+} from '@/shared/infrastructure/api/api.types';
 
 export type ParsedApiPayload<T> = {
   successPayload: Partial<ApiEnvelope<T>>;
@@ -23,6 +27,7 @@ export function resolveErrorMessage<T>(parsedPayload: ParsedApiPayload<T>): {
   code?: string;
   statusCode?: number;
   timestamp?: string;
+  fields?: ApiErrorField[];
 } {
   const { errorPayload, successPayload, data } = parsedPayload;
   const apiError = errorPayload.error;
@@ -33,10 +38,14 @@ export function resolveErrorMessage<T>(parsedPayload: ParsedApiPayload<T>): {
     (data as Record<string, unknown>)?.message?.toString() ??
     'Error de servidor';
 
+  // `fields` puede llegar a nivel raíz o bajo `error` según el endpoint.
+  const fields = apiError?.fields ?? errorPayload.fields;
+
   return {
     message,
     code: apiError?.code,
     statusCode: apiError?.statusCode,
     timestamp: errorPayload.timestamp,
+    fields,
   };
 }

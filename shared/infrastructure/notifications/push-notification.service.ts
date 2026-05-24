@@ -9,7 +9,8 @@ import {
 } from '@react-native-firebase/messaging';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
-import { apiClient } from '../api/api-client';
+
+import { setFcmToken } from '@/shared/infrastructure/device/device';
 
 export type PushPermissionStatus = 'granted' | 'denied' | 'undetermined';
 
@@ -79,40 +80,40 @@ export async function getDevicePushToken(): Promise<string | null> {
   }
 }
 
-export async function registerPushTokenOnServer(
-  token: string,
-  platform: PushPlatform,
-): Promise<void> {
-  try {
-    await apiClient('/users/me/push-token', {
-      method: 'PUT',
-      body: { token, platform },
-    });
-  } catch (err) {
-    console.error('[Push] Error registrando push token en servidor:', err);
-  }
-}
-
-export async function removePushTokenFromServer(): Promise<void> {
-  try {
-    await apiClient('/users/me/push-token', { method: 'DELETE' });
-  } catch {
-    // no-op — no es crítico si falla
-  }
-}
-
+/** Pide permiso, obtiene token y lo cachea como header `X-Fcm-Token`.
+ *  Usar cuando el usuario activa push desde el toggle. */
 export async function initializePushNotifications(): Promise<PushNotificationState> {
   const permissionStatus = await requestNotificationPermissions();
 
   if (permissionStatus !== 'granted') {
+    setFcmToken(null);
     return { pushToken: null, permissionStatus };
   }
 
   const pushToken = await getDevicePushToken();
-
-  if (pushToken) {
-    await registerPushTokenOnServer(pushToken, Platform.OS as PushPlatform);
-  }
+  setFcmToken(pushToken);
 
   return { pushToken, permissionStatus };
+}
+
+/** Si el permiso ya estaba concedido (sesión previa), obtiene el token y
+ *  lo cachea. NO solicita permiso al usuario. Pensado para el boot de la app
+ *  — así `X-Fcm-Token` ya está presente en el primer request (incluido login). */
+export async function bootstrapPushIfGranted(): Promise<PushNotificationState> {
+  const permissionStatus = await getNotificationPermissionStatus();
+
+  if (permissionStatus !== 'granted') {
+    setFcmToken(null);
+    return { pushToken: null, permissionStatus };
+  }
+
+  const pushToken = await getDevicePushToken();
+  setFcmToken(pushToken);
+
+  return { pushToken, permissionStatus };
+}
+
+/** Limpia el FCM token cacheado (al desactivar push o al logout). */
+export function clearLocalPushToken(): void {
+  setFcmToken(null);
 }

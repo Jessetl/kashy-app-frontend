@@ -1,6 +1,6 @@
-// Imports directos al hook de reset (no al barrel) para evitar el ciclo:
-// `use-auth` → `@/modules/debts` (barrel) → `useDebts` → `use-auth`.
-// Los hooks `use-reset-*` no tienen ninguna dependencia transitiva sobre auth.
+// Imports directos al composition / hooks de reset (no al barrel) para evitar
+// ciclos. El composition de auth no toca presentation, así que es seguro.
+import { logoutUseCase } from '@/modules/auth/composition';
 import { resetDebtsModule } from '@/modules/debts/presentation/hooks/use-reset-debts';
 import { resetSupermarketModule } from '@/modules/supermarket/presentation/hooks/use-reset-supermarket';
 import type { AuthUser } from '@/shared/domain/auth/auth.types';
@@ -14,7 +14,7 @@ interface UseAuthReturn {
   user: AuthUser | null;
   /** Si se está restaurando la sesión al abrir la app */
   isRestoringSession: boolean;
-  /** Cierra la sesión y limpia datos persistidos */
+  /** Cierra sesión: notifica backend (`POST /auth/logout`) y limpia local. */
   logout: () => void;
   /** Abre el modal de login, opcionalmente con acción pendiente post-login */
   openLoginModal: (pendingAction?: () => void) => void;
@@ -28,9 +28,14 @@ export function useAuth(): UseAuthReturn {
   const openLoginModal = useAuthStore((s) => s.openLoginModal);
 
   const logout = useCallback(() => {
+    // Fire-and-forget: el backend revoca el refresh token del dispositivo,
+    // pero la limpieza local debe ocurrir siempre (incluso si el request falla
+    // por red caída o 401). No bloqueamos UI.
+    void logoutUseCase.execute().catch(() => {
+      // no-op intencional
+    });
+
     clearSession();
-    // Limpiar datos de módulos para no filtrar datos entre usuarios.
-    // Cada módulo expone su propio reset vía barrel público.
     resetSupermarketModule();
     resetDebtsModule();
   }, [clearSession]);

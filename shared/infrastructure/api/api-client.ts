@@ -12,10 +12,12 @@ import {
 import {
   clearSessionSync,
   getAccessToken,
-  getRefreshToken,
   updateTokensSync,
 } from '@/shared/infrastructure/auth/auth.store';
+import { getDeviceHeaders } from '@/shared/infrastructure/device/device';
 
+// `EXPO_PUBLIC_API_URL` debe incluir el prefijo `/api/v1`
+// (ej. `https://api.kashy.app/api/v1`).
 const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 
 // Mutex para evitar múltiples refresh simultáneos
@@ -23,20 +25,22 @@ let isRefreshing = false;
 let refreshPromise: Promise<AuthTokens | null> | null = null;
 
 async function attemptRefresh(): Promise<AuthTokens | null> {
-  const refreshToken = getRefreshToken();
+  const expiredToken = getAccessToken();
 
-  if (!refreshToken) {
+  if (!expiredToken) {
     return null;
   }
 
   try {
-    const response = await fetch(`${API_URL}/users/refresh`, {
+    const deviceHeaders = await getDeviceHeaders();
+    const response = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
+        Authorization: `Bearer ${expiredToken}`,
+        ...deviceHeaders,
       },
-      body: JSON.stringify({ refreshToken }),
     });
 
     if (!response.ok) {
@@ -76,21 +80,32 @@ async function executeRequest(
   path: string,
   options: RequestOptions = {},
 ): Promise<Response> {
-  const { method = 'GET', body, headers = {}, token, skipAuth } = options;
+  const {
+    method = 'GET',
+    body,
+    headers = {},
+    token,
+    skipAuth,
+    skipDeviceHeaders,
+  } = options;
 
   const requestHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     Accept: 'application/json',
-    ...headers,
   };
 
-  // Auto-attach token si no se pasa uno explícito y no es skipAuth
+  if (!skipDeviceHeaders) {
+    Object.assign(requestHeaders, await getDeviceHeaders());
+  }
+
   if (!skipAuth) {
     const authToken = token ?? getAccessToken();
     if (authToken) {
       requestHeaders['Authorization'] = `Bearer ${authToken}`;
     }
   }
+
+  Object.assign(requestHeaders, headers);
 
   return fetch(`${API_URL}${path}`, {
     method,
@@ -113,20 +128,34 @@ export async function apiClient<T>(
 ): Promise<ApiResponse<T>> {
   let response = await executeRequest(path, options);
 
-  // Si es 401 y no es una request de auth (login/refresh), intentar refresh
   if (response.status === 401 && !options.skipAuth) {
     const newTokens = await refreshTokenOnce();
 
-    if (newTokens?.idToken) {
-      // Reintentar con el nuevo token
+    if (newTokens?.accessToken) {
       response = await executeRequest(path, {
         ...options,
-        token: newTokens.idToken,
+        token: newTokens.accessToken,
       });
     } else {
-      // Refresh falló — sesión inválida, volver a guest
       clearSessionSync();
     }
+  }
+
+  // `204 No Content` → no hay body que parsear
+  if (response.status === 204) {
+    if (!response.ok) {
+      throw new ApiHttpError({
+        message: 'Error de servidor',
+        status: response.status,
+      });
+    }
+    return {
+      success: true,
+      data: null as T,
+      timestamp: new Date().toISOString(),
+      ok: true,
+      status: response.status,
+    };
   }
 
   const rawPayload = (await response.json()) as unknown;
@@ -141,6 +170,7 @@ export async function apiClient<T>(
       statusCode: parsedError.statusCode,
       code: parsedError.code,
       timestamp: parsedError.timestamp,
+      fields: parsedError.fields,
     });
   }
 

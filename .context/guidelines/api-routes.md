@@ -4,6 +4,8 @@
 > Define qué enviar, qué esperar y cómo manejar cada respuesta.
 > Cada servicio tiene su propio archivo `.md` en la carpeta `router/`.
 
+> **Convención de nombrado:** Todos los keys JSON (request y response) usan **camelCase** (`accessToken`, `firstName`, `amountLocal`, `totalPages`, etc.). Los valores enum permanecen en `UPPER_SNAKE_CASE` (`TEMPLATE`, `INCOME`, `PENDING`).
+
 ---
 
 ## Configuración Base
@@ -31,7 +33,7 @@ const getHeaders = (token?: string): Record<string, string> => ({
 | :-------------- | :------------------------------------------------------------------------ | :------------------------------ |
 | `X-Device-Id`   | Generar UUID al primer uso, guardar en AsyncStorage.                      | `a1b2c3d4-e5f6-...`             |
 | `X-Device-Name` | React Native Device Info: `${Platform.OS} ${osVersion} ${brand} ${model}` | `Android 14 Samsung Galaxy S24` |
-| `Authorization` | Token JWT recibido en login/register. Guardar en Zustand + AsyncStorage.  | `Bearer eyJhbG...`              |
+| `Authorization` | Token JWT recibido en login. Guardar en Zustand + AsyncStorage.           | `Bearer eyJhbG...`              |
 
 ---
 
@@ -50,45 +52,71 @@ No requieren `Authorization`, `X-Device-Id` ni `X-Device-Name`.
 
 El frontend **nunca** maneja el refresh token de Firebase. El flujo es:
 
-1. Login/Register devuelve `access_token` (JWT custom, 15 min) + `expires_in`.
-2. Guardar `access_token` en Zustand (memoria) y AsyncStorage (persistencia).
-3. En cada request, enviar `Authorization: Bearer {access_token}`.
+1. Login devuelve `accessToken` (JWT custom, 15 min) + `expiresIn`.
+2. Guardar `accessToken` en Zustand (memoria) y AsyncStorage (persistencia).
+3. En cada request, enviar `Authorization: Bearer {accessToken}`.
 4. Si el backend responde `401`:
-   - Llamar a `POST /auth/refresh` (solo envía `X-Device-Id`).
-   - Si responde `200`: guardar el nuevo `access_token` y reintentar el request original.
+   - Llamar a `POST /auth/refresh` (envía `X-Device-Id` + JWT expirado en `Authorization` como proof-of-possession).
+   - Si responde `200`: guardar el nuevo `accessToken` y reintentar el request original.
    - Si responde `401`: el refresh token expiró o fue revocado → redirigir al login.
 5. **Nunca pedir al usuario que vuelva a loguearse si el refresh funciona.**
 
 ```typescript
-// Interceptor de Axios simplificado
-axios.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+import ky from 'ky';
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const { data } = await axios.post('/auth/refresh', null, {
-          headers: {
-            'X-Device-Id': deviceId,
-            'X-Device-Name': deviceName,
-          },
-        });
-
-        setAccessToken(data.access_token);
-        originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
-        return axios(originalRequest);
-      } catch {
-        clearSession();
-        navigateToLogin();
-      }
-    }
-
-    return Promise.reject(error);
+const api = ky.create({
+  prefixUrl: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
   },
-);
+  hooks: {
+    beforeRequest: [
+      (request) => {
+        request.headers.set('X-Device-Id', deviceId);
+        request.headers.set('X-Device-Name', deviceName);
+
+        const token = getAccessToken();
+        if (token) {
+          request.headers.set('Authorization', `Bearer ${token}`);
+        }
+      },
+    ],
+    afterResponse: [
+      async (request, options, response) => {
+        if (response.status === 401 && !request.headers.get('X-Retry')) {
+          try {
+            const expiredToken = getAccessToken();
+
+            const refreshResponse = await ky
+              .post(`${API_BASE_URL}/auth/refresh`, {
+                headers: {
+                  'X-Device-Id': deviceId,
+                  'X-Device-Name': deviceName,
+                  ...(expiredToken && {
+                    Authorization: `Bearer ${expiredToken}`,
+                  }),
+                },
+              })
+              .json<{ accessToken: string }>();
+
+            setAccessToken(refreshResponse.accessToken);
+
+            request.headers.set(
+              'Authorization',
+              `Bearer ${refreshResponse.accessToken}`,
+            );
+            request.headers.set('X-Retry', 'true');
+
+            return ky(request, options);
+          } catch {
+            clearSession();
+            navigateToLogin();
+          }
+        }
+      },
+    ],
+  },
+});
 ```
 
 ---
@@ -116,7 +144,7 @@ Los endpoints de listado usan `POST` con filtros en el body.
     page: number,
     limit: number,
     total: number,
-    total_pages: number,
+    totalPages: number,
   }
 }
 ```
@@ -163,14 +191,17 @@ const mapFieldErrors = (fields: ApiError['fields']): Record<string, string> => {
   return errors;
 };
 
-// Uso en un form
+// Uso en un form con Ky
 const onSubmit = async (data: FormData) => {
   try {
-    await api.post('/auth/register', data);
+    await api.post('auth/register', { json: data });
   } catch (error) {
-    if (error.response?.status === 422) {
-      const fieldErrors = mapFieldErrors(error.response.data.fields);
-      setErrors(fieldErrors); // Mostrar errores por campo
+    if (error instanceof HTTPError) {
+      const body = await error.response.json<ApiError>();
+      if (error.response.status === 422) {
+        const fieldErrors = mapFieldErrors(body.fields);
+        setErrors(fieldErrors); // Mostrar errores por campo
+      }
     }
   }
 };
@@ -205,9 +236,9 @@ const onSubmit = async (data: FormData) => {
 
 ## Catálogo de Servicios
 
-| Servicio           | Archivo                                                  | Descripción                                                     |
-| :----------------- | :------------------------------------------------------- | :-------------------------------------------------------------- |
-| **Auth**           | [`router/authentication.md`](./router/authentication.md) | Registro, login, Google, refresh, contraseña, perfil, logout.   |
-| **Shopping Lists** | [`router/shopping-lists.md`](./router/shopping-lists.md) | CRUD de listas con items en batch. Comparadora de métricas.     |
-| **Finances**       | [`router/finances.md`](./router/finances.md)             | CRUD de ingresos/egresos. Summary del dashboard.                |
-| **Notifications**  | [`router/notifications.md`](./router/notifications.md)   | Listado, lectura, eliminación y preferencias de notificaciones. |
+| Servicio           | Archivo                                                  | Descripción                                                       |
+| :----------------- | :------------------------------------------------------- | :---------------------------------------------------------------- |
+| **Auth**           | [`router/authentication.md`](./router/authentication.md) | Registro, login, Google, contraseña, perfil, logout.              |
+| **Shopping Lists** | [`router/shopping-lists.md`](./router/shopping-lists.md) | CRUD de listas de compras (batch items). Comparadora de métricas. |
+| **Finances**       | [`router/finances.md`](./router/finances.md)             | CRUD de ingresos/egresos. Recurrencia, recordatorios y summary.   |
+| **Notifications**  | [`router/notifications.md`](./router/notifications.md)   | Listado, lectura, eliminación de notificaciones y preferencias.   |

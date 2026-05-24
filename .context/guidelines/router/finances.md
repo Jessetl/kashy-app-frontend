@@ -1,7 +1,9 @@
-# 💰 Finances — `/api/v1/finances`
+# 💰 Finances — `/finances`
 
 > CRUD de registros financieros y summary del dashboard.
 > Solo el rol KASHY consume estos endpoints. El GUEST solo visualiza datos estáticos/vacíos.
+
+> **Convención de nombrado:** Request y response usan **camelCase** en los keys JSON (`amountLocal`, `amountUsd`, `interestRate`, `isRecurring`, etc.). Los valores enum permanecen en `UPPER_SNAKE_CASE` (`INCOME`, `EXPENSE`, `HIGH`, `MEDIUM`, `LOW`, `PENDING`, `SENT`, `FAILED`).
 
 ---
 
@@ -13,14 +15,18 @@
 |  🟡   | `POST`   | `/finances/search`  |  ✅  | Listar registros con filtros y paginación. |
 |  🟢   | `GET`    | `/finances/:id`     |  ✅  | Obtener detalle de un registro.            |
 |  🟠   | `PATCH`  | `/finances/:id`     |  ✅  | Actualizar un registro.                    |
-|  🔴   | `DELETE` | `/finances/:id`     |  ✅  | Eliminar un registro.                      |
+|  🔴   | `DELETE` | `/finances/:id`     |  ✅  | Eliminar un registro y sus notificaciones. |
 |  🟢   | `GET`    | `/finances/summary` |  ✅  | Resumen del mes para el dashboard.         |
+
+> **Nota:** Todas las rutas llevan el prefijo `/api/v1` (ya incluido en `API_BASE_URL`). Los headers `Authorization`, `X-Device-Id` y `X-Device-Name` son obligatorios en todos los endpoints.
 
 ---
 
 ## Endpoints
 
 ### 🟡 `POST /finances`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
 **Enviar:**
 
@@ -29,51 +35,60 @@
   "type": "INCOME | EXPENSE",
   "title": "string",
   "description": "string | null",
-  "amount_local": 0.0,
-  "amount_usd": 0.0,
+  "amountLocal": 0.0,
+  "amountUsd": 0.0,
   "priority": "HIGH | MEDIUM | LOW | null",
-  "interest_rate": 0.0,
-  "date": "2026-06-15",
-  "is_recurring": false,
-  "recurrence_day": "integer (1-31) | null"
+  "interestRate": 0.0,
+  "date": "2026-06-15 | null",
+  "isRecurring": false,
+  "recurrenceDay": "integer (1-31) | null"
 }
 ```
 
-> El frontend calcula la conversión entre `amount_local` y `amount_usd` usando la tasa de cambio actual. El usuario elige en qué moneda ingresar, el frontend calcula la otra. El backend valida la consistencia (±1% de tolerancia).
+> El frontend calcula la conversión entre `amountLocal` y `amountUsd` usando la tasa de cambio actual. El usuario elige en qué moneda ingresar, el frontend calcula la otra. El backend valida la consistencia (±1% de tolerancia).
 
 **Esperar `201`:**
 
 ```json
 {
   "id": "uuid",
-  "user_id": "uuid",
+  "userId": "uuid",
   "type": "EXPENSE",
   "title": "string",
   "description": "string | null",
-  "amount_local": 0.0,
-  "amount_usd": 0.0,
+  "amountLocal": 0.0,
+  "amountUsd": 0.0,
   "priority": "HIGH | null",
-  "interest_rate": 0.0,
-  "date": "2026-06-15",
-  "is_recurring": false,
-  "recurrence_day": null,
+  "interestRate": 0.0,
+  "date": "2026-06-15 | null",
+  "isRecurring": false,
+  "recurrenceDay": null,
   "notification": {
     "id": "uuid",
-    "scheduled_at": "2026-06-14",
+    "scheduledAt": "2026-06-14",
+    "sentAt": null,
     "status": "PENDING"
   }
 }
 ```
 
-> Si `date` está presente, el backend crea automáticamente una notificación 1 día antes. Si `date` es null, `notification` será null.
+> Si `date` está presente, el backend crea automáticamente una notificación 1 día antes. Si `date` es `null`, `notification` será `null`.
 
 **Acción en frontend:** Agregar al store. Si tiene `notification`, mostrar indicador de recordatorio.
 
-**Errores:** `400`, `401`, `422`
+**Errores:**
+
+| Código | Qué hacer                                                                |
+| :----- | :----------------------------------------------------------------------- |
+| `400`  | Body malformado. Bug del frontend — revisar payload.                     |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático.    |
+| `422`  | Validación fallida. Mapear `fields[]` a errores por campo en formulario. |
 
 ---
 
 ### 🟡 `POST /finances/search`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
 **Enviar:**
 
@@ -84,9 +99,9 @@
   "filters": {
     "type": "INCOME | EXPENSE | null",
     "priority": "HIGH | MEDIUM | LOW | null",
-    "is_recurring": "boolean | null",
-    "date_from": "date | null",
-    "date_to": "date | null"
+    "isRecurring": "boolean | null",
+    "dateFrom": "date | null",
+    "dateTo": "date | null"
   }
 }
 ```
@@ -100,42 +115,56 @@
       "id": "uuid",
       "type": "EXPENSE",
       "title": "string",
-      "amount_local": 0.0,
-      "amount_usd": 0.0,
+      "amountLocal": 0.0,
+      "amountUsd": 0.0,
       "priority": "HIGH | null",
-      "date": "2026-06-15",
-      "is_recurring": false,
-      "notification_status": "PENDING | SENT | FAILED | null"
+      "date": "2026-06-15 | null",
+      "isRecurring": false,
+      "notificationStatus": "PENDING | SENT | FAILED | null"
     }
   ],
   "meta": {
     "page": 1,
     "limit": 20,
     "total": 35,
-    "total_pages": 2
+    "totalPages": 2
   }
 }
 ```
 
 > El listado devuelve resúmenes. Usar `GET /:id` para el detalle completo con notificación.
 
-**Acción en frontend:** Renderizar la lista de finanzas. Usar `notification_status` para mostrar íconos de estado.
+**Acción en frontend:** Renderizar la lista de finanzas. Usar `notificationStatus` para mostrar íconos de estado.
 
-**Errores:** `400`, `401`
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `400`  | Body malformado. Bug del frontend — revisar payload.                  |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |
 
 ---
 
 ### 🟢 `GET /finances/:id`
 
-**Esperar `200`:** Objeto completo del registro con su notificación (mismo shape que response de create).
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
-**Acción en frontend:** Cargar en el store de detalle. Mostrar todos los campos incluyendo `description`, `interest_rate` y detalle de notificación.
+**Esperar `200`:** Objeto completo del registro con su notificación (mismo shape que response de create, incluye `sentAt` en `notification`).
 
-**Errores:** `400`, `401`, `404`
+**Acción en frontend:** Cargar en el store de detalle. Mostrar todos los campos incluyendo `description`, `interestRate` y detalle de notificación.
+
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |
+| `404`  | Registro no encontrado. Mostrar mensaje y navegar atrás al listado.   |
 
 ---
 
 ### 🟠 `PATCH /finances/:id`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
 **Enviar:** Solo los campos que cambian.
 
@@ -144,13 +173,13 @@
   "type": "INCOME | EXPENSE | null",
   "title": "string | null",
   "description": "string | null",
-  "amount_local": "number | null",
-  "amount_usd": "number | null",
+  "amountLocal": "number | null",
+  "amountUsd": "number | null",
   "priority": "HIGH | MEDIUM | LOW | null",
-  "interest_rate": "number | null",
+  "interestRate": "number | null",
   "date": "date | null",
-  "is_recurring": "boolean | null",
-  "recurrence_day": "integer (1-31) | null"
+  "isRecurring": "boolean | null",
+  "recurrenceDay": "integer (1-31) | null"
 }
 ```
 
@@ -160,21 +189,39 @@
 
 **Acción en frontend:** Reemplazar en el store con la respuesta.
 
-**Errores:** `400`, `401`, `404`, `422`
+**Errores:**
+
+| Código | Qué hacer                                                                |
+| :----- | :----------------------------------------------------------------------- |
+| `400`  | Body malformado. Bug del frontend — revisar payload.                     |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático.    |
+| `404`  | Registro no encontrado. Mostrar mensaje y navegar atrás al listado.      |
+| `422`  | Validación fallida. Mapear `fields[]` a errores por campo en formulario. |
 
 ---
 
 ### 🔴 `DELETE /finances/:id`
 
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
+
 **Esperar:** `204 No Content` (sin body).
 
-**Acción en frontend:** Remover del store. Navegar atrás al listado. El backend elimina las notificaciones asociadas automáticamente.
+> El backend elimina las notificaciones asociadas automáticamente.
 
-**Errores:** `400`, `401`, `404`
+**Acción en frontend:** Remover del store. Navegar atrás al listado.
+
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |
+| `404`  | Registro no encontrado. Ya fue eliminado — actualizar UI.             |
 
 ---
 
 ### 🟢 `GET /finances/summary`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
 **Query params opcionales:**
 
@@ -191,18 +238,18 @@
 {
   "month": 6,
   "year": 2026,
-  "total_income_local": 0.0,
-  "total_income_usd": 0.0,
-  "total_expense_local": 0.0,
-  "total_expense_usd": 0.0,
-  "net_balance_local": 0.0,
-  "net_balance_usd": 0.0,
-  "upcoming_expenses": [
+  "totalIncomeLocal": 0.0,
+  "totalIncomeUsd": 0.0,
+  "totalExpenseLocal": 0.0,
+  "totalExpenseUsd": 0.0,
+  "netBalanceLocal": 0.0,
+  "netBalanceUsd": 0.0,
+  "upcomingExpenses": [
     {
       "id": "uuid",
       "title": "string",
-      "amount_local": 0.0,
-      "amount_usd": 0.0,
+      "amountLocal": 0.0,
+      "amountUsd": 0.0,
       "date": "2026-06-15",
       "priority": "HIGH | null"
     }
@@ -210,8 +257,13 @@
 }
 ```
 
-> `upcoming_expenses` devuelve máximo 3 egresos por vencer. Esto alimenta el Dashboard.
+> `upcomingExpenses` devuelve máximo 3 egresos por vencer (ordenados por fecha ascendente, `date >= hoy`). Esto alimenta el Dashboard.
 
 **Acción en frontend:** Renderizar balance neto, ingresos, egresos y los próximos 3 vencimientos en el Dashboard.
 
-**Errores:** `400`, `401`
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `400`  | Query params inválidos. Bug del frontend — revisar values.            |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |

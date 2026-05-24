@@ -1,15 +1,9 @@
-import { ApiHttpError } from '@/shared/infrastructure/api/api-http-error';
-import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
-import { useCallback, useState } from 'react';
-
 import {
-  changePasswordUseCase,
-  updateProfileUseCase,
-} from '../../composition';
-import type {
-  ChangePasswordInput,
-  UpdateProfileInput,
-} from '../../domain/entities/user-profile.entity';
+  useChangePassword,
+  useUpdateProfile,
+  type ChangePasswordInput,
+  type UpdateProfileInput,
+} from '@/modules/auth';
 
 interface UseAccountReturn {
   isUpdatingProfile: boolean;
@@ -18,63 +12,30 @@ interface UseAccountReturn {
   changePassword: (input: ChangePasswordInput) => Promise<boolean>;
   profileError: string | null;
   passwordError: string | null;
+  profileFieldErrors: Record<string, string> | null;
+  passwordFieldErrors: Record<string, string> | null;
   clearProfileError: () => void;
   clearPasswordError: () => void;
 }
 
-function getErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof ApiHttpError) return err.message;
-  if (err instanceof Error) return err.message;
-  return fallback;
-}
-
+/** Facade del módulo profile sobre las primitivas de auth.
+ *  Mantiene la firma usada por `account.screen.tsx`. */
 export function useAccount(): UseAccountReturn {
-  const updateUser = useAuthStore((s) => s.updateUser);
+  const {
+    isLoading: isUpdatingProfile,
+    error: profileError,
+    fieldErrors: profileFieldErrors,
+    updateProfile,
+    clearError: clearProfileError,
+  } = useUpdateProfile();
 
-  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [passwordError, setPasswordError] = useState<string | null>(null);
-
-  const updateProfile = useCallback(
-    async (input: UpdateProfileInput): Promise<boolean> => {
-      setProfileError(null);
-      setIsUpdatingProfile(true);
-      try {
-        const normalized = await updateProfileUseCase.execute(input);
-        updateUser({
-          firstName: normalized.firstName,
-          lastName: normalized.lastName,
-        });
-        return true;
-      } catch (err) {
-        setProfileError(getErrorMessage(err, 'No se pudo actualizar el nombre.'));
-        return false;
-      } finally {
-        setIsUpdatingProfile(false);
-      }
-    },
-    [updateUser],
-  );
-
-  const changePassword = useCallback(
-    async (input: ChangePasswordInput): Promise<boolean> => {
-      setPasswordError(null);
-      setIsChangingPassword(true);
-      try {
-        await changePasswordUseCase.execute(input);
-        return true;
-      } catch (err) {
-        setPasswordError(
-          getErrorMessage(err, 'No se pudo cambiar la contraseña.'),
-        );
-        return false;
-      } finally {
-        setIsChangingPassword(false);
-      }
-    },
-    [],
-  );
+  const {
+    isLoading: isChangingPassword,
+    error: passwordError,
+    fieldErrors: passwordFieldErrors,
+    changePassword,
+    clearError: clearPasswordError,
+  } = useChangePassword();
 
   return {
     isUpdatingProfile,
@@ -83,7 +44,9 @@ export function useAccount(): UseAccountReturn {
     changePassword,
     profileError,
     passwordError,
-    clearProfileError: useCallback(() => setProfileError(null), []),
-    clearPasswordError: useCallback(() => setPasswordError(null), []),
+    profileFieldErrors,
+    passwordFieldErrors,
+    clearProfileError,
+    clearPasswordError,
   };
 }

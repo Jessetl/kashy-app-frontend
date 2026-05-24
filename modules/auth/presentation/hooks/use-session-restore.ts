@@ -7,10 +7,16 @@ import { refreshTokenUseCase } from '../../composition';
 /**
  * Hook que restaura la sesión al montar la app.
  *
- * Si hay un refreshToken guardado en storage persistente, intenta renovar los tokens
- * silenciosamente. Solo limpia la sesión cuando el refresh es inválido (4xx).
- * Ante errores transitorios de red/servidor, mantiene la sesión local.
- * En cualquier caso, marca `isRestoringSession = false` al terminar.
+ * Si hay un accessToken guardado en storage persistente, intenta renovar el
+ * token silenciosamente vía `/auth/refresh`. El refresh token vive solo en el
+ * backend; el frontend solo envía el JWT actual/expirado como
+ * proof-of-possession (lo maneja el datasource a partir del store).
+ *
+ * - 4xx en refresh → sesión inválida o revocada → limpiar y volver a guest.
+ * - 5xx o error de red → mantener sesión local; los próximos requests podrán
+ *   reintentar.
+ *
+ * En cualquier caso marca `isRestoringSession = false` al terminar.
  */
 export function useSessionRestore(): void {
   const hydrateSession = useAuthStore((s) => s.hydrateSession);
@@ -29,38 +35,34 @@ export function useSessionRestore(): void {
     async function restore() {
       await hydrateSession();
 
-      const { isAuthenticated, refreshToken } = useAuthStore.getState();
+      const { isAuthenticated, accessToken } = useAuthStore.getState();
 
-      // Si no hay sesión previa, no hay nada que restaurar
-      if (!isAuthenticated || !refreshToken) {
+      if (!isAuthenticated || !accessToken) {
         setRestoringSession(false);
         return;
       }
 
       try {
-        const newTokens = await refreshTokenUseCase.execute(refreshToken);
+        const newTokens = await refreshTokenUseCase.execute();
         updateTokens(newTokens);
       } catch (err) {
         if (__DEV__) {
           console.warn('[SessionRestore] Error al restaurar sesión', err);
         }
         if (!(err instanceof ApiHttpError)) {
-          // Error de red/parseo: mantener sesión local y reintentar en próximas requests.
           return;
         }
 
         if (err.status >= 500) {
-          // Backend temporalmente caído: no degradar a guest por un fallo transitorio.
           return;
         }
 
-        // Refresh inválido (4xx) — sesión expirada, volver a guest
         clearSession();
       } finally {
         setRestoringSession(false);
       }
     }
 
-    restore();
+    void restore();
   }, [clearSession, hydrateSession, setRestoringSession, updateTokens]);
 }

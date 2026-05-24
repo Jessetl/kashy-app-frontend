@@ -7,31 +7,48 @@ export type {
 } from '@/shared/domain/auth/auth.types';
 export type { CountryCode } from '@/shared/domain/country/country.constants';
 
-/** Datos para autenticación con Google (register o login unificado) */
-export interface GoogleAuthCredentials {
-  idToken: string | null;
-  accessToken: string | null;
-  country: CountryCode;
-  locationLatitude: number;
-  locationLongitude: number;
-}
-
-/**
- * Tipo propio del módulo auth — solo usado por el flujo de login.
- * No pertenece a shared/ porque solo lo consume este módulo.
- */
+/** Credenciales para login con email + contraseña. */
 export interface LoginCredentials {
   email: string;
   password: string;
 }
 
-/** Datos necesarios para registrar un nuevo usuario */
+/** Datos para registrar un nuevo usuario.
+ *  Las coordenadas son opcionales (el guideline acepta `null`). */
 export interface RegisterCredentials {
   email: string;
   password: string;
   firstName: string;
   lastName: string;
-  country: CountryCode;
-  locationLatitude: number;
-  locationLongitude: number;
+  countryCode: CountryCode;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+/** Datos para autenticación con Google.
+ *  El backend valida el `googleIdToken` directamente
+ *  y aplica `countryCode = 'VE'` por defecto cuando el usuario es nuevo. */
+export interface GoogleAuthCredentials {
+  googleIdToken: string;
+}
+
+/** Payload parcial para `PATCH /auth/profile`. Solo enviar campos modificados. */
+export interface UpdateProfileInput {
+  firstName?: string | null;
+  lastName?: string | null;
+  avatarUrl?: string | null;
+  countryCode?: CountryCode | null;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
+/** Payload para `POST /auth/change-password`. */
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+/** Payload para `POST /auth/recover-password`. */
+export interface RecoverPasswordInput {
+  email: string;
 }

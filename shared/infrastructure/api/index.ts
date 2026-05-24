@@ -4,6 +4,7 @@ export type {
   ApiEnvelope,
   ApiErrorDetail,
   ApiErrorEnvelope,
+  ApiErrorField,
   ApiResponse,
   RequestOptions,
 } from './api.types';

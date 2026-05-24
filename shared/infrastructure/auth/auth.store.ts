@@ -12,7 +12,6 @@ type PersistedAuthSession = {
   isAuthenticated: boolean;
   user: AuthUser | null;
   accessToken: string | null;
-  refreshToken: string | null;
 };
 
 interface AuthState {
@@ -22,15 +21,13 @@ interface AuthState {
   isAuthenticated: boolean;
   /** Datos del usuario autenticado */
   user: AuthUser | null;
-  /** Access token actual */
+  /** Access token actual (JWT custom del backend, ~15 min de vida) */
   accessToken: string | null;
-  /** Refresh token para renovar la sesión */
-  refreshToken: string | null;
   /** Si la sesión se está restaurando al abrir la app */
   isRestoringSession: boolean;
   /** Si el modal de login está visible */
   isLoginModalVisible: boolean;
-  /** Acción pendiente a ejecutar tras login exitoso (regla #6 ARCHITECTURE_MASTER) */
+  /** Acción pendiente a ejecutar tras login exitoso */
   pendingAction: (() => void) | null;
 
   /** Guarda la sesión completa tras login exitoso */
@@ -58,7 +55,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isAuthenticated: false,
   user: null,
   accessToken: null,
-  refreshToken: null,
   isRestoringSession: true,
   isLoginModalVisible: false,
   pendingAction: null,
@@ -66,12 +62,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   setSession: (session: AuthSession) => {
     const persistedSession: PersistedAuthSession = {
       isAuthenticated: true,
-      user: session.user ?? null,
-      accessToken: session.tokens.idToken,
-      refreshToken: session.tokens.refreshToken,
+      user: session.user,
+      accessToken: session.tokens.accessToken,
     };
 
-    // Capturar la acción pendiente antes de limpiarla del state
     const { pendingAction } = get();
 
     set({
@@ -85,9 +79,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       JSON.stringify(persistedSession),
     );
 
-    // Ejecutar la acción pendiente DESPUÉS de que isAuthenticated = true
     if (pendingAction) {
-      // Defer para que el state se haya propagado a los subscribers
       queueMicrotask(pendingAction);
     }
   },
@@ -102,7 +94,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       isAuthenticated: state.isAuthenticated,
       user: updatedUser,
       accessToken: state.accessToken,
-      refreshToken: state.refreshToken,
     };
 
     void secureStorage.setItem(
@@ -112,17 +103,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 
   updateTokens: (tokens: AuthTokens) => {
-    set({
-      accessToken: tokens.idToken,
-      refreshToken: tokens.refreshToken,
-    });
+    set({ accessToken: tokens.accessToken });
 
     const state = get();
     const persistedSession: PersistedAuthSession = {
       isAuthenticated: state.isAuthenticated,
       user: state.user,
-      accessToken: tokens.idToken,
-      refreshToken: tokens.refreshToken,
+      accessToken: tokens.accessToken,
     };
 
     void secureStorage.setItem(
@@ -136,7 +123,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       isAuthenticated: false,
       user: null,
       accessToken: null,
-      refreshToken: null,
     });
 
     void secureStorage.removeItem(AUTH_SESSION_KEY);
@@ -165,7 +151,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         isAuthenticated: parsed.isAuthenticated,
         user: parsed.user,
         accessToken: parsed.accessToken,
-        refreshToken: parsed.refreshToken,
         hasHydrated: true,
       });
     } catch {
@@ -182,22 +167,17 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
 // --- Selectores para uso fuera de React (api-client, interceptors) ---
 
-/** Obtiene el access token actual de forma síncrona */
+/** Obtiene el access token actual de forma síncrona. */
 export function getAccessToken(): string | null {
   return useAuthStore.getState().accessToken;
 }
 
-/** Obtiene el refresh token actual de forma síncrona */
-export function getRefreshToken(): string | null {
-  return useAuthStore.getState().refreshToken;
-}
-
-/** Actualiza tokens de forma síncrona (para el interceptor) */
+/** Actualiza tokens de forma síncrona (para el interceptor de refresh). */
 export function updateTokensSync(tokens: AuthTokens): void {
   useAuthStore.getState().updateTokens(tokens);
 }
 
-/** Limpia sesión de forma síncrona (para el interceptor cuando refresh falla) */
+/** Limpia sesión de forma síncrona (para el interceptor cuando refresh falla). */
 export function clearSessionSync(): void {
   useAuthStore.getState().clearSession();
 }

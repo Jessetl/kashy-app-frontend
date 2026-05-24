@@ -1,21 +1,15 @@
-import {
-  DEFAULT_COUNTRY_CODE,
-  type CountryCode,
-} from '@/shared/domain/country/country.constants';
 import { ApiHttpError } from '@/shared/infrastructure/api';
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
-import { useCountryStore } from '@/shared/infrastructure/country/country.store';
-import { useLocationStore } from '@/shared/infrastructure/location/location.store';
-import auth from '@react-native-firebase/auth';
 import * as Google from 'expo-auth-session/providers/google';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
+
 import { googleAuthUseCase } from '../../composition';
 
 WebBrowser.maybeCompleteAuthSession();
 
-// IDs de cliente de Google — puedes sobreescribirlos con EXPO_PUBLIC_GOOGLE_*.
+// IDs de cliente de Google — configurables vía EXPO_PUBLIC_GOOGLE_*.
 const GOOGLE_CONFIG = {
   androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
   iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
@@ -23,7 +17,6 @@ const GOOGLE_CONFIG = {
 } as const;
 
 interface UseGoogleAuthOptions {
-  country?: CountryCode;
   onSuccess?: () => void;
 }
 
@@ -55,12 +48,8 @@ const getGoogleAuthErrorMessage = (err: unknown): string => {
 };
 
 export function useGoogleAuth({
-  country,
   onSuccess,
 }: UseGoogleAuthOptions = {}): UseGoogleAuthReturn {
-  const coords = useLocationStore((s) => s.coords);
-  const storedCountry = useCountryStore((s) => s.countryCode);
-  const setCountry = useCountryStore((s) => s.setCountry);
   const setSession = useAuthStore((s) => s.setSession);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -95,39 +84,18 @@ export function useGoogleAuth({
       return;
     }
 
-    const { authentication } = response;
-    if (!authentication) {
+    const googleIdToken = response.authentication?.idToken;
+    if (!googleIdToken) {
+      setError('No se recibió token de Google');
       return;
     }
-
-    const resolvedCountry = country ?? storedCountry ?? DEFAULT_COUNTRY_CODE;
-    const { idToken, accessToken } = authentication;
 
     setIsLoading(true);
     setError(null);
 
-    if (!idToken || !accessToken) {
-      setError('No se recibieron tokens de Google');
-      setIsLoading(false);
-      return;
-    }
-
-    void auth()
-      .signInWithCredential(
-        auth.GoogleAuthProvider.credential(idToken, accessToken),
-      )
-      .then((credential) => credential.user.getIdToken(true))
-      .then((firebaseIdToken) =>
-        googleAuthUseCase.execute({
-          idToken: firebaseIdToken,
-          accessToken,
-          country: resolvedCountry,
-          locationLatitude: coords?.latitude ?? 0,
-          locationLongitude: coords?.longitude ?? 0,
-        }),
-      )
+    void googleAuthUseCase
+      .execute({ googleIdToken })
       .then((session) => {
-        setCountry(resolvedCountry);
         setSession(session);
         onSuccess?.();
       })
@@ -137,15 +105,7 @@ export function useGoogleAuth({
       .finally(() => {
         setIsLoading(false);
       });
-  }, [
-    response,
-    country,
-    storedCountry,
-    setCountry,
-    setSession,
-    onSuccess,
-    coords,
-  ]);
+  }, [response, setSession, onSuccess]);
 
   const promptAsync = useCallback(() => {
     if (
@@ -153,7 +113,7 @@ export function useGoogleAuth({
       !GOOGLE_CONFIG.iosClientId ||
       !GOOGLE_CONFIG.webClientId
     ) {
-      setError('Configuracion de Google incompleta.');
+      setError('Configuración de Google incompleta.');
       return;
     }
 

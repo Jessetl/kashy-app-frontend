@@ -1,8 +1,5 @@
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
-import {
-  registerPushTokenOnServer,
-  type PushPlatform,
-} from '@/shared/infrastructure/notifications/push-notification.service';
+import { setFcmToken } from '@/shared/infrastructure/device/device';
 import { usePushNotificationStore } from '@/shared/infrastructure/notifications/push-notification.store';
 import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
 import {
@@ -23,12 +20,11 @@ type NotificationData = Record<string, string | number | object | undefined>;
 export function usePushNotifications() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const hasHydrated = useAuthStore((s) => s.hasHydrated);
-  const initialize = usePushNotificationStore((s) => s.initialize);
-  const hasInitialized = usePushNotificationStore((s) => s.hasInitialized);
+  const bootstrap = usePushNotificationStore((s) => s.bootstrap);
+  const clearToken = usePushNotificationStore((s) => s.clearToken);
   const refreshPermissionStatus = usePushNotificationStore(
     (s) => s.refreshPermissionStatus,
   );
-  const clearToken = usePushNotificationStore((s) => s.clearToken);
 
   const router = useRouter();
 
@@ -44,36 +40,34 @@ export function usePushNotifications() {
     [router],
   );
 
-  // Inicializar cuando el usuario se autentica
+  // Bootstrap del FCM token al iniciar la app (no pide permiso, solo lo cachea
+  // si ya estaba aprobado). Esto asegura que `X-Fcm-Token` esté presente en el
+  // primer request — incluido el login.
   useEffect(() => {
-    if (!hasHydrated || !isAuthenticated || hasInitialized) {
-      return;
-    }
-    void initialize();
-  }, [isAuthenticated, hasHydrated, hasInitialized, initialize]);
+    if (!hasHydrated) return;
+    void bootstrap();
+  }, [hasHydrated, bootstrap]);
 
-  // Limpiar token al desloguearse
+  // Limpiar FCM local al desloguearse
   const prevAuth = useRef(isAuthenticated);
   useEffect(() => {
     if (prevAuth.current && !isAuthenticated) {
-      void clearToken();
+      clearToken();
     }
     prevAuth.current = isAuthenticated;
   }, [isAuthenticated, clearToken]);
 
-  // Re-registrar token si FCM lo rota
+  // Re-cachear token si FCM lo rota
   useEffect(() => {
-    if (!isAuthenticated) return;
-
     const unsubscribe = onTokenRefresh(getMessaging(), (newToken) => {
       if (newToken) {
-        void registerPushTokenOnServer(newToken, Platform.OS as PushPlatform);
+        setFcmToken(newToken);
         usePushNotificationStore.setState({ pushToken: newToken });
       }
     });
 
     return unsubscribe;
-  }, [isAuthenticated]);
+  }, []);
 
   // Mensaje recibido en foreground → mostrarlo con notifee
   useEffect(() => {

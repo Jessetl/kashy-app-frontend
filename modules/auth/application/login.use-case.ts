@@ -5,13 +5,18 @@ export class LoginUseCase {
   constructor(private readonly authPort: AuthPort) {}
 
   async execute(credentials: LoginCredentials): Promise<AuthSession> {
-    if (!credentials.email.trim()) {
+    const email = credentials.email.trim();
+
+    if (!email) {
       throw new Error('El email es requerido');
     }
     if (!credentials.password.trim()) {
       throw new Error('La contraseña es requerida');
     }
 
-    return this.authPort.login(credentials);
+    return this.authPort.login({
+      email,
+      password: credentials.password,
+    });
   }
 }

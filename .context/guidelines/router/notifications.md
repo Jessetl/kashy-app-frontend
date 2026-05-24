@@ -1,4 +1,4 @@
-# 🔔 Notifications — `/api/v1/notifications`
+# 🔔 Notifications — `/notifications`
 
 > Listado, lectura y eliminación de notificaciones, y gestión de preferencias.
 > Solo el rol KASHY consume estos endpoints.
@@ -17,11 +17,17 @@
 |  🟢   | `GET`    | `/notifications/preferences`  |  ✅  | Obtener preferencias.                           |
 |  🟠   | `PATCH`  | `/notifications/preferences`  |  ✅  | Actualizar preferencias.                        |
 
+> **Nota:** Todas las rutas llevan el prefijo `/api/v1` (ya incluido en `API_BASE_URL`). Los headers `Authorization`, `X-Device-Id` y `X-Device-Name` son obligatorios en todos los endpoints.
+
+> **Convención de nombrado:** Request y response usan **camelCase** en los keys JSON (`isRead`, `sentAt`, `unreadCount`, `pushEnabled`, etc.). Los valores enum permanecen en `UPPER_SNAKE_CASE` (`PENDING`, `SENT`, `FAILED`, `EXPENSE`).
+
 ---
 
 ## Endpoints
 
 ### 🟡 `POST /notifications/search`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
 **Enviar:**
 
@@ -30,11 +36,11 @@
   "page": 1,
   "limit": 20,
   "filters": {
-    "is_read": "boolean | null",
+    "isRead": "boolean | null",
     "status": "PENDING | SENT | FAILED | null",
     "type": "string | null",
-    "scheduled_date_from": "date | null",
-    "scheduled_date_to": "date | null"
+    "scheduledDateFrom": "date | null",
+    "scheduledDateTo": "date | null"
   }
 }
 ```
@@ -47,16 +53,16 @@
     {
       "id": "uuid",
       "type": "string",
-      "scheduled_at": "2026-06-14",
-      "sent_at": "2026-06-14 | null",
+      "scheduledAt": "2026-06-14",
+      "sentAt": "2026-06-14 | null",
       "status": "SENT",
-      "is_read": false,
-      "financial_record": {
+      "isRead": false,
+      "financialRecord": {
         "id": "uuid",
         "title": "string",
         "type": "EXPENSE",
-        "amount_local": 0.0,
-        "amount_usd": 0.0,
+        "amountLocal": 0.0,
+        "amountUsd": 0.0,
         "date": "2026-06-15"
       }
     }
@@ -65,36 +71,49 @@
     "page": 1,
     "limit": 20,
     "total": 25,
-    "total_pages": 2
+    "totalPages": 2
   }
 }
 ```
 
-> Cada notificación incluye un resumen del registro financiero asociado. Usar `financial_record.id` para navegar al detalle si el usuario toca la notificación.
+> Cada notificación incluye un resumen del registro financiero asociado. Usar `financialRecord.id` para navegar al detalle si el usuario toca la notificación.
 
-**Acción en frontend:** Renderizar lista en el dropdown de notificaciones. Resaltar visualmente las que tienen `is_read: false`.
+**Acción en frontend:** Renderizar lista en el dropdown de notificaciones. Resaltar visualmente las que tienen `isRead: false`.
 
-**Errores:** `400`, `401`
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `400`  | Body malformado. Bug del frontend — revisar payload.                  |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |
 
 ---
 
 ### 🟢 `GET /notifications/unread-count`
 
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
+
 **Esperar `200`:**
 
 ```json
 {
-  "unread_count": 5
+  "unreadCount": 5
 }
 ```
 
 **Acción en frontend:** Actualizar el badge del icono de notificaciones en el Dashboard. Llamar este endpoint al cargar el Dashboard y después de marcar como leídas.
 
-**Errores:** `401`
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |
 
 ---
 
 ### 🟠 `PATCH /notifications/:id/read`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
 **Enviar:** Body vacío.
 
@@ -104,28 +123,36 @@
 {
   "id": "uuid",
   "type": "string",
-  "scheduled_at": "2026-06-14",
-  "sent_at": "2026-06-14 | null",
+  "scheduledAt": "2026-06-14",
+  "sentAt": "2026-06-14 | null",
   "status": "SENT",
-  "is_read": true,
-  "financial_record": {
+  "isRead": true,
+  "financialRecord": {
     "id": "uuid",
     "title": "string",
     "type": "EXPENSE",
-    "amount_local": 0.0,
-    "amount_usd": 0.0,
+    "amountLocal": 0.0,
+    "amountUsd": 0.0,
     "date": "2026-06-15"
   }
 }
 ```
 
-**Acción en frontend:** Actualizar la notificación en el store con `is_read: true`. Decrementar el badge.
+**Acción en frontend:** Actualizar la notificación en el store con `isRead: true`. Decrementar el badge.
 
-**Errores:** `400`, `401`, `404`
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `400`  | Body malformado. Bug del frontend — revisar payload.                  |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |
+| `404`  | Notificación no encontrada. Remover del store y actualizar UI.        |
 
 ---
 
 ### 🟡 `POST /notifications/read-all`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
 **Enviar:** Body vacío.
 
@@ -133,57 +160,79 @@
 
 ```json
 {
-  "marked_count": 5
+  "markedCount": 5
 }
 ```
 
-**Acción en frontend:** Marcar todas las notificaciones del store como `is_read: true`. Resetear el badge a 0.
+**Acción en frontend:** Marcar todas las notificaciones del store como `isRead: true`. Resetear el badge a 0.
 
-**Errores:** `401`
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |
 
 ---
 
 ### 🔴 `DELETE /notifications/:id`
 
-**Esperar:** `204 No Content` (sin body).
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
-**Acción en frontend:** Remover la notificación del store. Decrementar el badge si era no leída.
+**Esperar:** `204 No Content` (sin body).
 
 > Eliminar una notificación no afecta al registro financiero asociado.
 
-**Errores:** `400`, `401`, `404`
+**Acción en frontend:** Remover la notificación del store. Decrementar el badge si era no leída.
+
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `400`  | Body malformado. Bug del frontend — revisar payload.                  |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |
+| `404`  | Notificación no encontrada. Remover del store y actualizar UI.        |
 
 ---
 
 ### 🟢 `GET /notifications/preferences`
 
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
+
 **Esperar `200`:**
 
 ```json
 {
-  "push_enabled": true,
-  "debt_reminders": true,
-  "price_alerts": false,
-  "list_reminders": true
+  "pushEnabled": true,
+  "debtReminders": true,
+  "priceAlerts": false,
+  "listReminders": true
 }
 ```
 
+> Si el usuario no tiene preferencias creadas, el backend devuelve los valores por defecto (todos en `true`).
+
 **Acción en frontend:** Renderizar los toggles en la pantalla de configuración de notificaciones.
 
-**Errores:** `401`
+**Errores:**
+
+| Código | Qué hacer                                                             |
+| :----- | :-------------------------------------------------------------------- |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático. |
 
 ---
 
 ### 🟠 `PATCH /notifications/preferences`
 
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
+
 **Enviar:** Solo los campos que cambian.
 
 ```json
 {
-  "push_enabled": "boolean | null",
-  "debt_reminders": "boolean | null",
-  "price_alerts": "boolean | null",
-  "list_reminders": "boolean | null"
+  "pushEnabled": "boolean | null",
+  "debtReminders": "boolean | null",
+  "priceAlerts": "boolean | null",
+  "listReminders": "boolean | null"
 }
 ```
 
@@ -191,13 +240,21 @@
 
 ```json
 {
-  "push_enabled": true,
-  "debt_reminders": true,
-  "price_alerts": true,
-  "list_reminders": false
+  "pushEnabled": true,
+  "debtReminders": true,
+  "priceAlerts": true,
+  "listReminders": false
 }
 ```
 
+> Si el usuario no tenía registro de preferencias, se crea automáticamente con los valores enviados y defaults para el resto.
+
 **Acción en frontend:** Reemplazar preferencias en el store con la respuesta. Actualizar los toggles visualmente.
 
-**Errores:** `400`, `401`, `422`
+**Errores:**
+
+| Código | Qué hacer                                                                |
+| :----- | :----------------------------------------------------------------------- |
+| `400`  | Body malformado. Bug del frontend — revisar payload.                     |
+| `401`  | Token expirado. El interceptor debería manejar el refresh automático.    |
+| `422`  | Validación fallida. Mapear `fields[]` a errores por campo en formulario. |

@@ -1,7 +1,7 @@
 import { usePushNotificationStore } from '@/shared/infrastructure/notifications/push-notification.store';
 import {
+  clearLocalPushToken,
   initializePushNotifications,
-  removePushTokenFromServer,
 } from '@/shared/infrastructure/notifications/push-notification.service';
 import { useCallback, useEffect, useRef } from 'react';
 // Reglas de negocio canónicas extraídas a `application/`. Este hook
@@ -75,8 +75,10 @@ export function useNotificationPreferences() {
 
         void updatePreferences({ pushEnabled: true });
       } else {
-        // Desactivar: limpiar token del servidor + desactivar todo
-        void removePushTokenFromServer();
+        // Desactivar: limpiar FCM cacheado local + desactivar todas las
+        // categorías en backend.
+        clearLocalPushToken();
+        usePushNotificationStore.setState({ pushToken: null });
         void updatePreferences({
           pushEnabled: false,
           debtReminders: false,

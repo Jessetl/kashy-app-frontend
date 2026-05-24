@@ -2,6 +2,7 @@ import { AuthModal } from '@/modules/auth/presentation/components/auth-modal';
 import { useSessionRestore } from '@/modules/auth/presentation/hooks/use-session-restore';
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { useCountryStore } from '@/shared/infrastructure/country/country.store';
+import { initDeviceHeaders } from '@/shared/infrastructure/device/device';
 import { useLocationStore } from '@/shared/infrastructure/location/location.store';
 import { AppThemeProvider } from '@/shared/infrastructure/theme';
 import { usePushNotifications } from '@/shared/presentation/hooks/use-push-notifications';
@@ -23,6 +24,11 @@ function AuthModalGlobal() {
 }
 
 function AppContent() {
+  // Inicializa `X-Device-Id` / `X-Device-Name` antes del primer request.
+  useEffect(() => {
+    void initDeviceHeaders();
+  }, []);
+
   // Restaurar sesión silenciosamente al abrir la app
   useSessionRestore();
 

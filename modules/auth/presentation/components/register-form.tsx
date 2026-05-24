@@ -14,7 +14,7 @@ import {
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
 import { ChevronDown } from 'lucide-react-native';
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import {
   Modal,
@@ -28,7 +28,7 @@ import { useGoogleAuth } from '../hooks/use-google-auth';
 import { useRegister, type RegisterFormValues } from '../hooks/use-register';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 6;
+const MIN_PASSWORD_LENGTH = 8;
 
 interface RegisterFormProps {
   onSwitchToLogin: () => void;
@@ -49,6 +49,7 @@ export const RegisterForm = React.memo(function RegisterForm({
     control,
     handleSubmit,
     reset,
+    setError,
     formState: { errors },
   } = useForm<RegisterFormValues>({
     defaultValues: {
@@ -56,37 +57,61 @@ export const RegisterForm = React.memo(function RegisterForm({
       lastName: '',
       email: '',
       password: '',
-      country: initialCountry ?? DEFAULT_COUNTRY_CODE,
+      countryCode: initialCountry ?? DEFAULT_COUNTRY_CODE,
     },
     mode: 'onBlur',
     reValidateMode: 'onChange',
   });
 
-  const { isLoading, error, successMessage, submitRegister, clearError } =
-    useRegister();
-
-  const handleFormSubmit = handleSubmit(async (values) => {
-    await submitRegister(values);
-  });
-
-  // Exponer reset al padre
-  React.useEffect(() => {
-    onResetRef(() => {
-      reset();
-      clearError();
-      clearGoogleError();
-    });
-  }, [clearError, clearGoogleError, onResetRef, reset]);
-
-  // Obtener el país seleccionado en el formulario para pasarlo al hook de Google
-  const watchedCountry = useCountryStore((s) => s.countryCode);
+  const {
+    isLoading,
+    error,
+    successMessage,
+    fieldErrors,
+    submitRegister,
+    clearError,
+    clearFieldErrors,
+  } = useRegister();
 
   const {
     promptAsync: googlePrompt,
     isLoading: googleLoading,
     error: googleError,
     clearError: clearGoogleError,
-  } = useGoogleAuth({ country: watchedCountry, onSuccess });
+  } = useGoogleAuth({ onSuccess });
+
+  const handleFormSubmit = handleSubmit(async (values) => {
+    await submitRegister(values);
+  });
+
+  // Aplica errores 422 del backend a los campos del formulario.
+  const FORM_FIELDS: ReadonlyArray<keyof RegisterFormValues> = [
+    'email',
+    'password',
+    'firstName',
+    'lastName',
+    'countryCode',
+  ];
+  React.useEffect(() => {
+    if (!fieldErrors) return;
+    Object.entries(fieldErrors).forEach(([field, message]) => {
+      if ((FORM_FIELDS as readonly string[]).includes(field)) {
+        setError(field as keyof RegisterFormValues, {
+          type: 'server',
+          message,
+        });
+      }
+    });
+  }, [fieldErrors, setError]);
+
+  React.useEffect(() => {
+    onResetRef(() => {
+      reset();
+      clearError();
+      clearFieldErrors();
+      clearGoogleError();
+    });
+  }, [clearError, clearFieldErrors, clearGoogleError, onResetRef, reset]);
 
   return (
     <>
@@ -227,7 +252,7 @@ export const RegisterForm = React.memo(function RegisterForm({
             <View style={styles.fieldWrapper}>
               <AppTextInput
                 label='Contraseña'
-                placeholder='Mínimo 6 caracteres'
+                placeholder='Mínimo 8 caracteres'
                 value={value}
                 onBlur={onBlur}
                 onChangeText={(text) => {
@@ -249,7 +274,7 @@ export const RegisterForm = React.memo(function RegisterForm({
 
         <Controller
           control={control}
-          name='country'
+          name='countryCode'
           rules={{ required: 'El país es requerido' }}
           render={({ field: { onChange, value } }) => {
             const selected =
@@ -267,7 +292,7 @@ export const RegisterForm = React.memo(function RegisterForm({
                     styles.countrySelector,
                     {
                       backgroundColor: colors.backgroundSecondary,
-                      borderColor: errors.country
+                      borderColor: errors.countryCode
                         ? colors.danger
                         : colors.borderLight,
                     },
@@ -289,9 +314,9 @@ export const RegisterForm = React.memo(function RegisterForm({
                     pointerEvents='none'
                   />
                 </AppPressable>
-                {errors.country && (
+                {errors.countryCode && (
                   <Text style={[styles.fieldError, { color: colors.danger }]}>
-                    {errors.country.message}
+                    {errors.countryCode.message}
                   </Text>
                 )}
 
