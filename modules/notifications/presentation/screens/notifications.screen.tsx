@@ -4,7 +4,9 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, BellOff, CheckCheck } from 'lucide-react-native';
 import React, { useCallback } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
@@ -12,7 +14,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { AppNotification } from '../../domain/entities/notification.entity';
-import { useNotificationStore } from '../../infrastructure/store/notification.store';
 import { NotificationItem } from '../components/notification-item';
 import { useNotifications } from '../hooks/use-notifications';
 
@@ -28,11 +29,14 @@ export default function NotificationsScreen() {
   const {
     notifications,
     unreadCount,
+    isLoading,
+    isLoadingMore,
+    isAuthenticated,
+    reload,
+    loadMore,
     markAsRead,
     markAllAsRead,
-    isAuthenticated,
   } = useNotifications();
-  const readIds = useNotificationStore((s) => s.readIds);
 
   const handleBack = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -41,42 +45,25 @@ export default function NotificationsScreen() {
 
   const handleItemPress = useCallback(
     (notification: AppNotification) => {
-      markAsRead(notification.id);
-
-      // Deep-link según tipo
-      switch (notification.type) {
-        case 'debt_due_reminder':
-        case 'debt_overdue':
-        case 'collection_due_reminder':
-          if (notification.relatedId) {
-            router.push(`/(tabs)/debts/${notification.relatedId}`);
-          } else {
-            router.push('/(tabs)/debts');
-          }
-          break;
-        case 'list_reminder':
-          router.push('/(tabs)/supermarket');
-          break;
-        case 'price_alert':
-          router.push('/(tabs)');
-          break;
-      }
+      void markAsRead(notification.id);
+      // Deep-link al detalle del registro financiero: el módulo de
+      // finanzas aún no tiene ruta dedicada, así que por ahora solo
+      // marcamos como leída y dejamos al usuario en la lista.
     },
-    [markAsRead, router],
+    [markAsRead],
   );
 
   const renderItem = useCallback<ListRenderItem<AppNotification>>(
     ({ item }) => (
-      <NotificationItem
-        notification={item}
-        isRead={readIds.has(item.id)}
-        onPress={handleItemPress}
-      />
+      <NotificationItem notification={item} onPress={handleItemPress} />
     ),
-    [readIds, handleItemPress],
+    [handleItemPress],
   );
 
   const keyExtractor = useCallback((item: AppNotification) => item.id, []);
+  const handleRefresh = useCallback(() => void reload(), [reload]);
+  const handleEndReached = useCallback(() => void loadMore(), [loadMore]);
+  const handleMarkAll = useCallback(() => void markAllAsRead(), [markAllAsRead]);
 
   return (
     <View
@@ -106,7 +93,7 @@ export default function NotificationsScreen() {
           )}
         </View>
         {unreadCount > 0 && (
-          <AppPressable onPress={markAllAsRead} style={styles.markAllButton}>
+          <AppPressable onPress={handleMarkAll} style={styles.markAllButton}>
             <CheckCheck size={18} color={colors.primary} strokeWidth={2} />
             <Text style={[styles.markAllText, { color: colors.primary }]}>
               Marcar todas
@@ -125,7 +112,25 @@ export default function NotificationsScreen() {
           notifications.length === 0 && styles.emptyContentContainer,
         ]}
         ItemSeparatorComponent={ItemSeparator}
-        ListEmptyComponent={<EmptyState isAuthenticated={isAuthenticated} />}
+        ListEmptyComponent={
+          isLoading ? null : <EmptyState isAuthenticated={isAuthenticated} />
+        }
+        ListFooterComponent={
+          isLoadingMore ? (
+            <View style={styles.footerLoader}>
+              <ActivityIndicator size='small' color={colors.primary} />
+            </View>
+          ) : null
+        }
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={handleRefresh}
+            tintColor={colors.primary}
+          />
+        }
         showsVerticalScrollIndicator={false}
       />
     </View>
@@ -153,8 +158,8 @@ function EmptyState({ isAuthenticated }: { isAuthenticated: boolean }) {
       </Text>
       <Text style={[styles.emptyMessage, { color: colors.textSecondary }]}>
         {isAuthenticated
-          ? 'Te avisaremos cuando tengas deudas por vencer, listas pendientes o cambios en la tasa.'
-          : 'Para recibir recordatorios de deudas y alertas necesitas una cuenta.'}
+          ? 'Te avisaremos cuando tengas movimientos relevantes en tus finanzas.'
+          : 'Para recibir notificaciones necesitas una cuenta.'}
       </Text>
     </View>
   );
@@ -213,6 +218,10 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 10,
+  },
+  footerLoader: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
   emptyContainer: {
     alignItems: 'center',

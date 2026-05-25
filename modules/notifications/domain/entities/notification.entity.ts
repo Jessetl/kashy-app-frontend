@@ -1,41 +1,50 @@
+import type { FinancialRecordSummary } from './financial-record-summary.entity';
+
+/** Estado de envío administrado por el backend. */
+export type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED';
+
 /**
- * Tipo de notificación — coincide con los toggles de `notification_preferences`
- * del backend (ARCHITECTURE_MASTER.md §6.1).
+ * Notificación tal como la entrega el router `/notifications/*`.
+ * `type` es un string libre (categoría de negocio); el discriminador
+ * útil para navegación es `financialRecord.type` (EXPENSE | INCOME).
  */
-export type NotificationType =
-  | 'debt_due_reminder' // Recordatorio de deuda próxima a vencer (≤ 24h)
-  | 'debt_overdue' // Deuda vencida y no pagada
-  | 'collection_due_reminder' // Recordatorio de cobro próximo a vencer
-  | 'list_reminder' // Lista activa sin actividad reciente
-  | 'price_alert'; // Variación significativa de la tasa
-
-export type NotificationSeverity = 'info' | 'warning' | 'danger' | 'success';
-
 export interface AppNotification {
-  /** ID estable derivado del origen — permite deduplicar entre renders */
   id: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  /** ISO string — cuándo "ocurrió" la notificación (ej. fecha de vencimiento) */
-  createdAt: string;
-  severity: NotificationSeverity;
-  /** ID de la entidad relacionada (ej. debt.id, shopping_list.id) para deep-link */
-  relatedId?: string;
+  type: string;
+  /** ISO date — cuándo fue programada para envío */
+  scheduledAt: string;
+  /** ISO date — cuándo se envió efectivamente; null si aún PENDING/FAILED */
+  sentAt: string | null;
+  status: NotificationStatus;
+  isRead: boolean;
+  financialRecord: FinancialRecordSummary;
 }
 
-/** Devuelve el icono de lucide-react-native correspondiente al tipo */
-export function getNotificationIconKey(type: NotificationType): string {
-  switch (type) {
-    case 'debt_due_reminder':
-      return 'clock';
-    case 'debt_overdue':
-      return 'alert-triangle';
-    case 'collection_due_reminder':
-      return 'hand-coins';
-    case 'list_reminder':
-      return 'shopping-cart';
-    case 'price_alert':
-      return 'trending-up';
-  }
+/** Filtros aceptados por POST /notifications/search */
+export interface NotificationFilters {
+  isRead?: boolean | null;
+  status?: NotificationStatus | null;
+  type?: string | null;
+  /** ISO date */
+  scheduledDateFrom?: string | null;
+  /** ISO date */
+  scheduledDateTo?: string | null;
+}
+
+export interface NotificationSearchInput {
+  page: number;
+  limit: number;
+  filters?: NotificationFilters;
+}
+
+export interface NotificationListMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface NotificationSearchResult {
+  data: AppNotification[];
+  meta: NotificationListMeta;
 }

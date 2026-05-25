@@ -4,9 +4,6 @@ import {
   initializePushNotifications,
 } from '@/shared/infrastructure/notifications/push-notification.service';
 import { useCallback, useEffect, useRef } from 'react';
-// Reglas de negocio canónicas extraídas a `application/`. Este hook
-// las implementa inline por simplicidad; si se agrega lógica nueva
-// preferir `togglePushNotifications` (use case puro y testeable).
 import type { NotificationPreferences } from '../../domain/entities/notification-preferences.entity';
 import { useNotificationPreferencesStore } from '../../infrastructure/store/notification-preferences.store';
 

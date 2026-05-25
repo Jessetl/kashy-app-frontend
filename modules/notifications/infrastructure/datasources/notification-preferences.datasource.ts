@@ -5,31 +5,22 @@ import { DEFAULT_PREFERENCES } from '../../domain/entities/notification-preferen
 import type { NotificationPreferencesPort } from '../../domain/ports/notification-preferences.port';
 
 const PREFS_CACHE_KEY = 'notification-prefs-cache';
-const ENDPOINT = '/users/me/notification-preferences';
+const ENDPOINT = '/notifications/preferences';
 
-/** Respuesta del endpoint de preferencias de notificación */
+/** Respuesta del endpoint de preferencias (camelCase, per scope). */
 interface PreferencesResponse {
   pushEnabled?: boolean;
-  push_enabled?: boolean;
   debtReminders?: boolean;
-  debt_reminders?: boolean;
   priceAlerts?: boolean;
-  price_alerts?: boolean;
   listReminders?: boolean;
-  list_reminders?: boolean;
-  updatedAt?: string;
 }
 
 function parsePreferences(data: PreferencesResponse): NotificationPreferences {
   return {
-    pushEnabled:
-      data.pushEnabled ?? data.push_enabled ?? DEFAULT_PREFERENCES.pushEnabled,
-    debtReminders:
-      data.debtReminders ?? data.debt_reminders ?? DEFAULT_PREFERENCES.debtReminders,
-    priceAlerts:
-      data.priceAlerts ?? data.price_alerts ?? DEFAULT_PREFERENCES.priceAlerts,
-    listReminders:
-      data.listReminders ?? data.list_reminders ?? DEFAULT_PREFERENCES.listReminders,
+    pushEnabled: data.pushEnabled ?? DEFAULT_PREFERENCES.pushEnabled,
+    debtReminders: data.debtReminders ?? DEFAULT_PREFERENCES.debtReminders,
+    priceAlerts: data.priceAlerts ?? DEFAULT_PREFERENCES.priceAlerts,
+    listReminders: data.listReminders ?? DEFAULT_PREFERENCES.listReminders,
   };
 }
 
@@ -54,7 +45,7 @@ export class NotificationPreferencesDatasource
     update: Partial<NotificationPreferences>,
   ): Promise<NotificationPreferences> {
     const response = await apiClient<PreferencesResponse>(ENDPOINT, {
-      method: 'PUT',
+      method: 'PATCH',
       body: {
         pushEnabled: update.pushEnabled,
         debtReminders: update.debtReminders,

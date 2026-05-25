@@ -2,36 +2,30 @@ import { AppPressable } from '@/shared/presentation/components/ui/app-pressable'
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { useCountry } from '@/shared/presentation/hooks/use-country';
 import {
-  AlertTriangle,
-  Clock,
-  HandCoins,
-  ShoppingCart,
-  TrendingUp,
+  ArrowDownLeft,
+  ArrowUpRight,
   type LucideIcon,
 } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import type { FinancialRecordType } from '../../domain/entities/financial-record-summary.entity';
 import type {
   AppNotification,
-  NotificationSeverity,
-  NotificationType,
+  NotificationStatus,
 } from '../../domain/entities/notification.entity';
 
-const ICON_MAP: Record<NotificationType, LucideIcon> = {
-  debt_due_reminder: Clock,
-  debt_overdue: AlertTriangle,
-  collection_due_reminder: HandCoins,
-  list_reminder: ShoppingCart,
-  price_alert: TrendingUp,
+const ICON_BY_RECORD_TYPE: Record<FinancialRecordType, LucideIcon> = {
+  EXPENSE: ArrowUpRight,
+  INCOME: ArrowDownLeft,
 };
 
 interface NotificationItemProps {
   notification: AppNotification;
-  isRead: boolean;
   onPress: (notification: AppNotification) => void;
 }
 
-function formatRelativeTime(iso: string, locale: string): string {
+function formatRelativeTime(iso: string | null, locale: string): string {
+  if (!iso) return 'Pendiente';
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'Ahora';
@@ -46,24 +40,41 @@ function formatRelativeTime(iso: string, locale: string): string {
   });
 }
 
+function formatAmount(amount: number, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+  }).format(amount);
+}
+
+function statusLabel(status: NotificationStatus): string {
+  switch (status) {
+    case 'PENDING':
+      return 'Pendiente';
+    case 'FAILED':
+      return 'Fallida';
+    case 'SENT':
+      return '';
+  }
+}
+
 export const NotificationItem = React.memo(function NotificationItem({
   notification,
-  isRead,
   onPress,
 }: NotificationItemProps) {
   const { colors } = useAppTheme();
   const { country } = useCountry();
-  const Icon = ICON_MAP[notification.type];
+  const { financialRecord, isRead, sentAt, scheduledAt, status } = notification;
+  const Icon = ICON_BY_RECORD_TYPE[financialRecord.type];
 
-  const severityColor = useMemo(() => {
-    const map: Record<NotificationSeverity, string> = {
-      danger: colors.danger,
-      warning: colors.warning ?? colors.danger,
-      info: colors.primary,
-      success: colors.success,
-    };
-    return map[notification.severity];
-  }, [notification.severity, colors]);
+  const accentColor = useMemo(() => {
+    if (status === 'FAILED') return colors.danger;
+    return financialRecord.type === 'EXPENSE' ? colors.danger : colors.success;
+  }, [status, financialRecord.type, colors]);
+
+  const timestamp = sentAt ?? scheduledAt;
+  const subtitle = statusLabel(status);
 
   return (
     <AppPressable
@@ -74,17 +85,14 @@ export const NotificationItem = React.memo(function NotificationItem({
           backgroundColor: isRead
             ? colors.backgroundSecondary
             : colors.backgroundTertiary,
-          borderLeftColor: severityColor,
+          borderLeftColor: accentColor,
         },
       ]}
     >
       <View
-        style={[
-          styles.iconCircle,
-          { backgroundColor: `${severityColor}22` },
-        ]}
+        style={[styles.iconCircle, { backgroundColor: `${accentColor}22` }]}
       >
-        <Icon size={20} color={severityColor} strokeWidth={2} />
+        <Icon size={20} color={accentColor} strokeWidth={2} />
       </View>
       <View style={styles.content}>
         <View style={styles.headerRow}>
@@ -98,22 +106,25 @@ export const NotificationItem = React.memo(function NotificationItem({
             ]}
             numberOfLines={2}
           >
-            {notification.title}
+            {financialRecord.title}
           </Text>
           {!isRead && (
             <View
-              style={[styles.unreadDot, { backgroundColor: severityColor }]}
+              style={[styles.unreadDot, { backgroundColor: accentColor }]}
             />
           )}
         </View>
         <Text
           style={[styles.message, { color: colors.textSecondary }]}
-          numberOfLines={2}
+          numberOfLines={1}
         >
-          {notification.message}
+          {formatAmount(financialRecord.amountUsd, country.locale)} ·{' '}
+          {financialRecord.type === 'EXPENSE' ? 'Gasto' : 'Ingreso'}
         </Text>
         <Text style={[styles.timeText, { color: colors.textTertiary }]}>
-          {formatRelativeTime(notification.createdAt, country.locale)}
+          {subtitle
+            ? `${subtitle} · ${formatRelativeTime(timestamp, country.locale)}`
+            : formatRelativeTime(timestamp, country.locale)}
         </Text>
       </View>
     </AppPressable>

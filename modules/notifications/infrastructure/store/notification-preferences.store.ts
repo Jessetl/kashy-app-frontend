@@ -54,10 +54,10 @@ export const useNotificationPreferencesStore =
       });
 
       try {
-        const saved = await datasource.updatePreferences({
-          ...previous,
-          ...update,
-        });
+        // Spec: "Enviar solo los campos que cambian". `update` ya viene
+        // pre-filtrado por el caller (toggle individual o togglePush con
+        // todas las categorías).
+        const saved = await datasource.updatePreferences(update);
         set({
           preferences: saved,
           isSaving: false,

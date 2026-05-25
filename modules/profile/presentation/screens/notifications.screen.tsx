@@ -26,7 +26,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNotificationPreferences } from '../hooks/use-notification-preferences';
+import { useNotificationPreferences } from '@/modules/notifications';
 
 /* ─── sub-componentes ─── */
 
