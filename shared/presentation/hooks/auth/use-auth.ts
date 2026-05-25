@@ -2,7 +2,7 @@
 // ciclos. El composition de auth no toca presentation, así que es seguro.
 import { logoutUseCase } from '@/modules/auth/composition';
 import { resetDebtsModule } from '@/modules/debts/presentation/hooks/use-reset-debts';
-import { resetSupermarketModule } from '@/modules/supermarket/presentation/hooks/use-reset-supermarket';
+import { resetShoppingListsModule } from '@/modules/shopping-lists/presentation/hooks/use-reset-shopping-lists';
 import type { AuthUser } from '@/shared/domain/auth/auth.types';
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { useCallback } from 'react';
@@ -36,7 +36,7 @@ export function useAuth(): UseAuthReturn {
     });
 
     clearSession();
-    resetSupermarketModule();
+    resetShoppingListsModule();
     resetDebtsModule();
   }, [clearSession]);
 

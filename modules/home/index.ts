@@ -3,7 +3,7 @@
  *
  * Home es un agregador de presentación — no tiene domain ni infrastructure
  * propios porque su único trabajo es componer datos de otros módulos
- * (debts, supermarket, notifications, exchange-rate) en una vista única.
+ * (debts, shopping-lists, notifications, exchange-rate) en una vista única.
  */
 
 // Presentation — API pública
