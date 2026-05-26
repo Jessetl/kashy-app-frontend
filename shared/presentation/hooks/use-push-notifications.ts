@@ -1,7 +1,10 @@
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { setFcmToken } from '@/shared/infrastructure/device/device';
 import { usePushNotificationStore } from '@/shared/infrastructure/notifications/push-notification.store';
-import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+import notifee, {
+  AndroidImportance,
+  EventType,
+} from '@/shared/infrastructure/notifications/notifee-shim';
 import {
   getInitialNotification,
   getMessaging,

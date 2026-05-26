@@ -1,4 +1,6 @@
-import notifee, { AndroidImportance } from '@notifee/react-native';
+import notifee, {
+  AndroidImportance,
+} from './shared/infrastructure/notifications/notifee-shim';
 import {
   getMessaging,
   setBackgroundMessageHandler,

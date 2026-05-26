@@ -23,7 +23,7 @@ export const QuickActions = React.memo(function QuickActions() {
       Icon: ListPlus,
       color: colors.primary,
       bgColor: colors.primaryLight,
-      route: '/(tabs)/shopping-lists',
+      route: '/(tabs)/shopping',
     },
     {
       label: 'Agregar deuda',
@@ -44,7 +44,7 @@ export const QuickActions = React.memo(function QuickActions() {
       Icon: TrendingUp,
       color: colors.warning,
       bgColor: colors.warningLight,
-      route: '/(tabs)/shopping-lists',
+      route: '/(tabs)/shopping',
     },
   ];
 

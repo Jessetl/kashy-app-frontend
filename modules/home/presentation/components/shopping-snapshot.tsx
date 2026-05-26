@@ -27,7 +27,7 @@ export const ShoppingSnapshot = React.memo(function ShoppingSnapshot({
   const router = useRouter();
 
   const handlePress = useCallback(() => {
-    router.push('/(tabs)/shopping-lists');
+    router.push('/(tabs)/shopping');
   }, [router]);
 
   const progress = totalItems > 0 ? purchasedItems / totalItems : 0;

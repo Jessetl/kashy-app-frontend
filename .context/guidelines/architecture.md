@@ -29,11 +29,28 @@ application/     → Casos de uso, DTOs, mappers.
 infrastructure/  → Implementación de repositorios (HTTP calls via Axios).
                    Depende de domain/ y application/.
 
-presentation/    → Componentes UI y Zustand store del dominio.
-                   Depende de application/. NO contiene screens (viven en app/).
+presentation/    → Componentes UI, view-model hooks y Zustand store del dominio.
+                   Depende de application/. Las screens viven en components/
+                   (con sufijo `Screen`); los wrappers de ruta están en app/.
+
+  presentation/components/  → UI completa, incluidas pantallas (`FooScreen.tsx`).
+  presentation/hooks/       → View-models (`useFooBarVm.ts`) y hooks de uso
+                              cross-componente. Compatible con la regla de capas
+                              porque sólo consume application/ + domain/.
+  presentation/store/       → Zustand store del dominio (`use{Dominio}Store.ts`).
 ```
 
 ---
+
+## Ubicación física
+
+| Carpeta    | Contenido                                                                       | Casing                    |
+| :--------- | :------------------------------------------------------------------------------ | :------------------------ |
+| `app/`     | Rutas de Expo Router. Convención de archivos del framework.                     | `kebab-case` (requisito). |
+| `modules/` | Dominios del producto (`auth`, `shopping`, `finances`, `notifications`, etc.).  | `kebab-case`.             |
+| `shared/`  | Shared kernel: UI, hooks, theme, HTTP, infraestructura compartida.              | `kebab-case`.             |
+
+> Los dominios siempre viven bajo `modules/`. Las screens viven bajo `app/` por requisito de Expo Router; ese es el único lugar donde se permiten archivos en `kebab-case` que actúan como wrappers de componentes del dominio.
 
 ## Estructura de Carpetas
 
@@ -291,14 +308,14 @@ Las screens en `app/` son archivos **delgados** que solo conectan navegación co
 
 ```typescript
 // app/(tabs)/shopping/index.tsx
-import { ShoppingListsScreen } from '@/shopping/presentation/components/ShoppingListsScreen';
+import { SavedListsScreen } from '@/modules/shopping/presentation/components/SavedListsScreen';
 
-export default function ShoppingLists() {
-  return <ShoppingListsScreen />;
+export default function ShoppingIndex() {
+  return <SavedListsScreen />;
 }
 ```
 
-> La screen real (componente pesado) vive en `presentation/components/` del dominio. El archivo en `app/` es solo un wrapper para Expo Router.
+> La screen real (componente pesado) vive en `presentation/components/` del dominio bajo el patrón `{Nombre}Screen.tsx`. El archivo en `app/` es solo un wrapper para Expo Router.
 
 ---
 
@@ -316,8 +333,10 @@ export default function ShoppingLists() {
 | DTO response         | `{nombre}-response.dto.ts`         | `auth-response.dto.ts`         |
 | Mapper               | `{nombre}.mapper.ts`               | `user.mapper.ts`               |
 | Componente React     | `{Nombre}.tsx` (PascalCase)        | `LoginForm.tsx`                |
+| Screen (componente)  | `{Nombre}Screen.tsx`               | `SavedListsScreen.tsx`         |
 | Zustand Store        | `use{Dominio}Store.ts`             | `useAuthStore.ts`              |
-| Hook                 | `use{Nombre}.ts`                   | `useDebounce.ts`               |
+| Hook (presentation)  | `use{Nombre}.ts`                   | `useSavedLists.ts`             |
+| View-model (hook)    | `use{Nombre}Vm.ts`                 | `useShoppingListsHeaderVm.ts`  |
 | Enum                 | `{nombre}.enum.ts`                 | `financial-type.enum.ts`       |
 | Util                 | `{nombre}.util.ts`                 | `currency.util.ts`             |
 | Constantes           | `{nombre}.constants.ts`            | `api.constants.ts`             |
@@ -345,12 +364,16 @@ export default function ShoppingLists() {
 ### ✅ Permitido
 
 ```
-presentation/ → application/ → domain/
-presentation/ → shared-kernel/
-application/  → shared-kernel/ (solo types, utils)
-app/ screens  → presentation/components/ del dominio correspondiente
-app/ screens  → shared-kernel/
+presentation/components/ → presentation/hooks/ (view-models, hooks de UI)
+presentation/components/ → presentation/store/
+presentation/hooks/      → application/ → domain/
+presentation/            → shared/ (shared kernel)
+application/             → shared/ (solo types, utils)
+app/ screens             → presentation/components/ del dominio correspondiente
+app/ screens             → shared/
 ```
+
+> Los view-models (`use*Vm.ts`) son hooks de presentación: aglutinan props y handlers para los componentes. Viven en `presentation/hooks/` y no rompen la dirección de dependencia porque sólo consumen `application/`, `domain/` y `presentation/store/`.
 
 ### ❌ Prohibido
 

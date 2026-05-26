@@ -5,7 +5,7 @@ import {
   type Debt,
 } from '@/modules/debts';
 import { useExchangeRate } from '@/modules/shared-services/exchange-rate';
-import { useShoppingListsSummary } from '@/modules/shopping-lists';
+import { useShoppingListsSummary } from '@/modules/shopping';
 import { localDateToMs } from '@/shared/domain/date/local-date';
 import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
 import { useCallback, useMemo } from 'react';

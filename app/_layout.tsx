@@ -57,14 +57,6 @@ function AppContent() {
           name='notifications'
           options={{ animation: 'slide_from_right' }}
         />
-        <Stack.Screen
-          name='saved-lists'
-          options={{ animation: 'slide_from_right' }}
-        />
-        <Stack.Screen
-          name='compare-lists'
-          options={{ animation: 'slide_from_right' }}
-        />
       </Stack>
       <AuthModalGlobal />
     </>

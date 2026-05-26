@@ -1,7 +1,7 @@
 import notifee, {
   AndroidImportance,
   AuthorizationStatus,
-} from '@notifee/react-native';
+} from '@/shared/infrastructure/notifications/notifee-shim';
 import {
   getMessaging,
   getToken,
@@ -34,9 +34,7 @@ async function ensureAndroidChannel(): Promise<void> {
   });
 }
 
-function mapAuthorizationStatus(
-  status: AuthorizationStatus,
-): PushPermissionStatus {
+function mapAuthorizationStatus(status: number): PushPermissionStatus {
   if (
     status === AuthorizationStatus.AUTHORIZED ||
     status === AuthorizationStatus.PROVISIONAL
