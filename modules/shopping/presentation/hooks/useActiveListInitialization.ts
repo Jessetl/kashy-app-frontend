@@ -15,7 +15,7 @@ export function useActiveListInitialization({
   isAuthenticated,
 }: UseActiveListInitializationParams) {
   const loadLists = useShoppingStore((s) => s.loadLists);
-  const createList = useShoppingStore((s) => s.createList);
+  const createDraft = useShoppingStore((s) => s.createDraft);
 
   const [isInitializingList, setIsInitializingList] = useState(false);
   const [listInitError, setListInitError] = useState<string | null>(null);
@@ -62,7 +62,7 @@ export function useActiveListInitialization({
               return;
             }
           } else {
-            await createList('Nueva lista');
+            createDraft();
             const stateAfterCreate = useShoppingStore.getState();
             if (stateAfterCreate.activeList) {
               if (!cancelled) {
@@ -94,7 +94,7 @@ export function useActiveListInitialization({
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, activeList, loadLists, createList, listInitRetryTick]);
+  }, [isAuthenticated, activeList, loadLists, createDraft, listInitRetryTick]);
 
   const canInteractWithList = Boolean(activeList) && !isInitializingList;
 

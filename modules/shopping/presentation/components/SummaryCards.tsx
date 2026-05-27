@@ -1,6 +1,10 @@
-import { useCountry } from '@/shared/presentation/hooks/use-country';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
-import { formatLocalAmount, formatUsdAmount } from '@/shared/presentation/utils/format-currency';
+import { useCountry } from '@/shared/presentation/hooks/use-country';
+import {
+  formatLocalAmount,
+  formatUsdAmount,
+} from '@/shared/presentation/utils/format-currency';
+import { Coins, TrendingUp, Wallet } from 'lucide-react-native';
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -15,7 +19,6 @@ export const SummaryCards = React.memo(function SummaryCards({
   totalLocal,
   totalUsd,
   spentLocal,
-  ivaEnabled,
 }: SummaryCardsProps) {
   const colors = useThemeColors();
   const { country } = useCountry();
@@ -29,73 +32,78 @@ export const SummaryCards = React.memo(function SummaryCards({
     [totalUsd, spentLocal, totalLocal, country],
   );
 
-  const cardStyles = useMemo(
-    () => ({
-      total: {
-        backgroundColor: colors.backgroundSecondary,
-        borderColor: colors.primary,
-      },
-      spent: {
-        backgroundColor: colors.backgroundSecondary,
-        borderColor: colors.danger,
-      },
-      ves: {
-        backgroundColor: colors.backgroundSecondary,
-        borderColor: colors.border,
-      },
-    }),
-    [colors.backgroundSecondary, colors.primary, colors.danger, colors.border],
-  );
-
   return (
     <View style={styles.container}>
-      {/* Total USD */}
-      <View style={[styles.card, cardStyles.total]}>
-        <Text style={[styles.cardLabel, { color: colors.textSecondary }]}>
-          Total
-        </Text>
-        <Text
-          style={[styles.cardValue, { color: colors.primary }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.58}
-        >
-          {values.totalUsd}
-        </Text>
-      </View>
-
-      {/* Gastado */}
-      <View style={[styles.card, cardStyles.spent]}>
-        <Text style={[styles.cardLabel, { color: colors.textSecondary }]}>
-          Gastado
-        </Text>
-        <Text
-          style={[styles.cardValue, { color: colors.danger }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.58}
-        >
-          {values.spentUsd}
-        </Text>
-      </View>
-
-      {/* En Bs */}
-      <View style={[styles.card, cardStyles.ves]}>
-        <Text style={[styles.cardLabel, { color: colors.textSecondary }]}>
-          {country.currencyLabel}
-        </Text>
-        <Text
-          style={[styles.cardValue, { color: colors.textOnSurface }]}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.58}
-        >
-          {values.totalLocal}
-        </Text>
-      </View>
+      <SummaryCard
+        Icon={TrendingUp}
+        label='Total'
+        value={values.totalUsd}
+        accent={colors.primary}
+        accentBg={colors.primaryLight}
+      />
+      <SummaryCard
+        Icon={Wallet}
+        label='Gastado'
+        value={values.spentUsd}
+        accent={colors.danger}
+        accentBg={colors.dangerLight}
+      />
+      <SummaryCard
+        Icon={Coins}
+        label={country.currencyLabel}
+        value={values.totalLocal}
+        accent={colors.textOnSurface}
+        accentBg={colors.backgroundTertiary}
+      />
     </View>
   );
 });
+
+interface SummaryCardProps {
+  Icon: React.ComponentType<{ size: number; color: string; strokeWidth: number }>;
+  label: string;
+  value: string;
+  accent: string;
+  accentBg: string;
+}
+
+function SummaryCard({
+  Icon,
+  label,
+  value,
+  accent,
+  accentBg,
+}: SummaryCardProps) {
+  const colors = useThemeColors();
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: colors.backgroundSecondary,
+          borderColor: `${accent}1F`,
+        },
+      ]}
+    >
+      <View style={styles.headerRow}>
+        <View style={[styles.iconWrap, { backgroundColor: accentBg }]}>
+          <Icon size={11} color={accent} strokeWidth={2.4} />
+        </View>
+        <Text style={[styles.label, { color: colors.textSecondary }]}>
+          {label}
+        </Text>
+      </View>
+      <Text
+        style={[styles.value, { color: accent }]}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.55}
+      >
+        {value}
+      </Text>
+    </View>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -104,18 +112,34 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
-    borderWidth: 1.5,
-    gap: 2,
+    borderWidth: 1,
+    gap: 8,
+    justifyContent: 'space-between',
+    minHeight: 78,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  iconWrap: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    alignItems: 'center',
     justifyContent: 'center',
   },
-  cardLabel: {
-    fontSize: 12,
-    fontWeight: '500',
+  label: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.2,
+    textTransform: 'uppercase',
   },
-  cardValue: {
+  value: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: -0.3,
   },
 });

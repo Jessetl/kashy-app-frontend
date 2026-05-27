@@ -1,7 +1,10 @@
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
 import { useCountry } from '@/shared/presentation/hooks/use-country';
-import { formatLocalAmount, formatUsdAmount } from '@/shared/presentation/utils/format-currency';
+import {
+  formatLocalAmount,
+  formatUsdAmount,
+} from '@/shared/presentation/utils/format-currency';
 import { Check, Minus, Pencil, Plus, Trash2 } from 'lucide-react-native';
 import React, { useCallback, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -9,12 +12,16 @@ import Animated, {
   FadeIn,
   FadeOut,
   LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
 } from 'react-native-reanimated';
 import type { ShoppingItem } from '../../domain/entities/shopping-list.entity';
 
 const LAYOUT_TRANSITION = LinearTransition.duration(300);
-const FADE_IN = FadeIn.duration(250).delay(80);
-const FADE_OUT = FadeOut.duration(150);
+const FADE_IN = FadeIn.duration(220).delay(60);
+const FADE_OUT = FadeOut.duration(140);
+const PRESS_SPRING = { mass: 0.3, damping: 14, stiffness: 240 };
 
 type ViewMode = 'grid' | 'list';
 
@@ -89,6 +96,17 @@ export const ProductItem = React.memo(function ProductItem({
   const colors = useThemeColors();
   const { country } = useCountry();
 
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+  const handlePressIn = useCallback(() => {
+    scale.value = withSpring(0.98, PRESS_SPRING);
+  }, [scale]);
+  const handlePressOut = useCallback(() => {
+    scale.value = withSpring(1, PRESS_SPRING);
+  }, [scale]);
+
   const safeQuantity = useMemo(
     () => Math.max(1, Math.trunc(asFiniteNumber(item.quantity, 1))),
     [item.quantity],
@@ -104,7 +122,6 @@ export const ProductItem = React.memo(function ProductItem({
     if (Number.isFinite(totalLocal)) {
       return totalLocal;
     }
-
     return safeUnitPriceLocal * safeQuantity;
   }, [item.totalLocal, safeQuantity, safeUnitPriceLocal]);
 
@@ -112,19 +129,15 @@ export const ProductItem = React.memo(function ProductItem({
     () => onToggle(item.id),
     [item.id, onToggle],
   );
-
   const handleDelete = useCallback(
     () => onDelete(item.id),
     [item.id, onDelete],
   );
-
   const handleEdit = useCallback(() => onEdit(item), [item, onEdit]);
-
   const handleIncrement = useCallback(
     () => onQuantityChange(item.id, safeQuantity + 1),
     [item.id, onQuantityChange, safeQuantity],
   );
-
   const handleDecrement = useCallback(() => {
     if (safeQuantity > 1) onQuantityChange(item.id, safeQuantity - 1);
   }, [item.id, onQuantityChange, safeQuantity]);
@@ -133,7 +146,6 @@ export const ProductItem = React.memo(function ProductItem({
     if (hasValidExchangeRate(exchangeRate)) {
       const unitUsd = safeUnitPriceLocal / exchangeRate;
       const totalUsd = safeTotalLocal / exchangeRate;
-
       return {
         unitPriceLabel: `${formatUsdAmount(unitUsd)} c/u`,
         unitPriceBsLabel: `${formatLocalAmount(safeUnitPriceLocal, country)} c/u`,
@@ -141,7 +153,6 @@ export const ProductItem = React.memo(function ProductItem({
         secondaryTotalLabel: formatLocalAmount(safeTotalLocal, country),
       };
     }
-
     return {
       unitPriceLabel: `${formatLocalAmount(safeUnitPriceLocal, country)} c/u`,
       unitPriceBsLabel: '',
@@ -151,59 +162,40 @@ export const ProductItem = React.memo(function ProductItem({
   }, [exchangeRate, safeTotalLocal, safeUnitPriceLocal, country]);
 
   const isList = viewMode === 'list';
+  const purchased = item.isPurchased;
+  const itemOpacity = purchased ? 0.62 : 1;
 
   return (
-    <Animated.View layout={LAYOUT_TRANSITION}>
+    <Animated.View layout={LAYOUT_TRANSITION} style={animatedStyle}>
       {isList ? (
-        <Animated.View
-          key='list'
-          entering={FADE_IN}
-          exiting={FADE_OUT}
-        >
+        <Animated.View key='list' entering={FADE_IN} exiting={FADE_OUT}>
           <AppPressable
             onPress={handleToggle}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            accessibilityRole='checkbox'
+            accessibilityState={{ checked: purchased }}
+            accessibilityLabel={item.productName}
             style={[
               listStyles.row,
               {
                 backgroundColor: colors.backgroundSecondary,
-                borderColor: item.isPurchased
-                  ? colors.primary
+                borderColor: purchased
+                  ? `${colors.primary}55`
                   : colors.borderLight,
+                opacity: itemOpacity,
               },
             ]}
           >
-            <View
-              style={[
-                listStyles.checkbox,
-                {
-                  backgroundColor: item.isPurchased
-                    ? colors.primary
-                    : 'transparent',
-                  borderColor: item.isPurchased
-                    ? colors.primary
-                    : colors.border,
-                },
-              ]}
-            >
-              {item.isPurchased && (
-                <Check
-                  size={11}
-                  color={colors.textInverse}
-                  pointerEvents='none'
-                />
-              )}
-            </View>
-
+            <Checkbox checked={purchased} size={18} />
             <Text
               style={[
                 listStyles.name,
                 {
-                  color: item.isPurchased
+                  color: purchased
                     ? colors.textTertiary
                     : colors.textOnSurface,
-                  textDecorationLine: item.isPurchased
-                    ? 'line-through'
-                    : 'none',
+                  textDecorationLine: purchased ? 'line-through' : 'none',
                 },
               ]}
               numberOfLines={1}
@@ -211,34 +203,12 @@ export const ProductItem = React.memo(function ProductItem({
               {item.productName}
             </Text>
 
-            <View style={listStyles.qtyWrap}>
-              <AppPressable
-                onPress={handleDecrement}
-                disabled={safeQuantity <= 1}
-              >
-                <Minus
-                  size={12}
-                  pointerEvents='none'
-                  color={
-                    safeQuantity <= 1
-                      ? colors.textTertiary
-                      : colors.textSecondary
-                  }
-                />
-              </AppPressable>
-              <Text
-                style={[listStyles.qty, { color: colors.textOnSurface }]}
-              >
-                {safeQuantity}
-              </Text>
-              <AppPressable onPress={handleIncrement}>
-                <Plus
-                  size={12}
-                  pointerEvents='none'
-                  color={colors.textSecondary}
-                />
-              </AppPressable>
-            </View>
+            <QuantityControl
+              quantity={safeQuantity}
+              onDecrement={handleDecrement}
+              onIncrement={handleIncrement}
+              compact
+            />
 
             {!hidePrices && (
               <View style={listStyles.priceCol}>
@@ -246,22 +216,26 @@ export const ProductItem = React.memo(function ProductItem({
                   style={[
                     listStyles.pricePrimary,
                     {
-                      color: item.isPurchased
+                      color: purchased
                         ? colors.textTertiary
                         : colors.primary,
                     },
                   ]}
+                  numberOfLines={1}
                 >
                   {displayData.primaryTotalLabel}
                 </Text>
-                <Text
-                  style={[
-                    listStyles.priceSecondary,
-                    { color: colors.textTertiary },
-                  ]}
-                >
-                  {displayData.secondaryTotalLabel}
-                </Text>
+                {displayData.secondaryTotalLabel ? (
+                  <Text
+                    style={[
+                      listStyles.priceSecondary,
+                      { color: colors.textTertiary },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {displayData.secondaryTotalLabel}
+                  </Text>
+                ) : null}
               </View>
             )}
 
@@ -282,57 +256,36 @@ export const ProductItem = React.memo(function ProductItem({
           </AppPressable>
         </Animated.View>
       ) : (
-        <Animated.View
-          key='grid'
-          entering={FADE_IN}
-          exiting={FADE_OUT}
-        >
+        <Animated.View key='grid' entering={FADE_IN} exiting={FADE_OUT}>
           <AppPressable
             onPress={handleToggle}
+            onPressIn={handlePressIn}
+            onPressOut={handlePressOut}
+            accessibilityRole='checkbox'
+            accessibilityState={{ checked: purchased }}
+            accessibilityLabel={item.productName}
             style={[
               gridStyles.container,
               {
                 backgroundColor: colors.backgroundSecondary,
-                borderColor: item.isPurchased
-                  ? colors.primary
+                borderColor: purchased
+                  ? `${colors.primary}55`
                   : colors.borderLight,
+                opacity: itemOpacity,
               },
             ]}
           >
             <View style={gridStyles.mainRow}>
-              <View
-                style={[
-                  gridStyles.checkbox,
-                  {
-                    backgroundColor: item.isPurchased
-                      ? colors.primary
-                      : 'transparent',
-                    borderColor: item.isPurchased
-                      ? colors.primary
-                      : colors.border,
-                  },
-                ]}
-              >
-                {item.isPurchased && (
-                  <Check
-                    size={13}
-                    color={colors.textInverse}
-                    pointerEvents='none'
-                  />
-                )}
-              </View>
-
+              <Checkbox checked={purchased} size={22} />
               <View style={gridStyles.info}>
                 <Text
                   style={[
                     gridStyles.name,
                     {
-                      color: item.isPurchased
+                      color: purchased
                         ? colors.textSecondary
                         : colors.textOnSurface,
-                      textDecorationLine: item.isPurchased
-                        ? 'line-through'
-                        : 'none',
+                      textDecorationLine: purchased ? 'line-through' : 'none',
                     },
                   ]}
                   numberOfLines={1}
@@ -345,10 +298,11 @@ export const ProductItem = React.memo(function ProductItem({
                       gridStyles.unitPrice,
                       { color: colors.textTertiary },
                     ]}
+                    numberOfLines={1}
                   >
                     {displayData.unitPriceLabel}
                     {displayData.unitPriceBsLabel
-                      ? `  ${displayData.unitPriceBsLabel}`
+                      ? `  ·  ${displayData.unitPriceBsLabel}`
                       : ''}
                   </Text>
                 )}
@@ -360,77 +314,41 @@ export const ProductItem = React.memo(function ProductItem({
                     style={[
                       gridStyles.totalPrimary,
                       {
-                        color: item.isPurchased
+                        color: purchased
                           ? colors.textSecondary
                           : colors.primary,
                       },
                     ]}
+                    numberOfLines={1}
                   >
                     {displayData.primaryTotalLabel}
                   </Text>
-                  <Text
-                    style={[
-                      gridStyles.totalSecondary,
-                      { color: colors.textTertiary },
-                    ]}
-                  >
-                    {displayData.secondaryTotalLabel}
-                  </Text>
+                  {displayData.secondaryTotalLabel ? (
+                    <Text
+                      style={[
+                        gridStyles.totalSecondary,
+                        { color: colors.textTertiary },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {displayData.secondaryTotalLabel}
+                    </Text>
+                  ) : null}
                 </View>
               )}
             </View>
 
             <View style={gridStyles.actionsRow}>
-              <View
-                style={[
-                  gridStyles.quantityGroup,
-                  { backgroundColor: colors.backgroundTertiary },
-                ]}
-              >
-                <AppPressable
-                  onPress={handleDecrement}
-                  style={({ pressed }) => [
-                    gridStyles.qtyBtn,
-                    pressed && gridStyles.qtyBtnPressed,
-                  ]}
-                  disabled={safeQuantity <= 1}
-                >
-                  <Minus
-                    size={14}
-                    pointerEvents='none'
-                    color={
-                      safeQuantity <= 1
-                        ? colors.textTertiary
-                        : colors.textOnSurface
-                    }
-                  />
-                </AppPressable>
-                <Text
-                  style={[
-                    gridStyles.qtyText,
-                    { color: colors.textOnSurface },
-                  ]}
-                >
-                  {safeQuantity}
-                </Text>
-                <AppPressable
-                  onPress={handleIncrement}
-                  style={({ pressed }) => [
-                    gridStyles.qtyBtn,
-                    pressed && gridStyles.qtyBtnPressed,
-                  ]}
-                >
-                  <Plus
-                    size={14}
-                    pointerEvents='none'
-                    color={colors.textOnSurface}
-                  />
-                </AppPressable>
-              </View>
-
+              <QuantityControl
+                quantity={safeQuantity}
+                onDecrement={handleDecrement}
+                onIncrement={handleIncrement}
+              />
               <View style={gridStyles.actionButtons}>
                 <AppPressable
                   onPress={handleEdit}
+                  accessibilityRole='button'
+                  accessibilityLabel='Editar producto'
                   style={[
                     gridStyles.actionBtn,
                     { backgroundColor: colors.backgroundTertiary },
@@ -440,10 +358,13 @@ export const ProductItem = React.memo(function ProductItem({
                     size={14}
                     pointerEvents='none'
                     color={colors.textSecondary}
+                    strokeWidth={2.2}
                   />
                 </AppPressable>
                 <AppPressable
                   onPress={handleDelete}
+                  accessibilityRole='button'
+                  accessibilityLabel='Eliminar producto'
                   style={[
                     gridStyles.actionBtn,
                     { backgroundColor: colors.dangerLight },
@@ -453,6 +374,7 @@ export const ProductItem = React.memo(function ProductItem({
                     size={14}
                     pointerEvents='none'
                     color={colors.danger}
+                    strokeWidth={2.2}
                   />
                 </AppPressable>
               </View>
@@ -464,63 +386,172 @@ export const ProductItem = React.memo(function ProductItem({
   );
 }, areProductItemPropsEqual);
 
-/* ── List view styles ─────────────────────────────────── */
+function Checkbox({ checked, size }: { checked: boolean; size: number }) {
+  const colors = useThemeColors();
+  return (
+    <View
+      style={[
+        checkboxStyles.box,
+        {
+          width: size,
+          height: size,
+          borderRadius: 7,
+          backgroundColor: checked ? colors.primary : 'transparent',
+          borderColor: checked ? colors.primary : colors.border,
+        },
+      ]}
+    >
+      {checked && (
+        <Check
+          size={size * 0.6}
+          color={colors.textInverse}
+          strokeWidth={3}
+          pointerEvents='none'
+        />
+      )}
+    </View>
+  );
+}
+
+function QuantityControl({
+  quantity,
+  onDecrement,
+  onIncrement,
+  compact = false,
+}: {
+  quantity: number;
+  onDecrement: () => void;
+  onIncrement: () => void;
+  compact?: boolean;
+}) {
+  const colors = useThemeColors();
+  const disabledDec = quantity <= 1;
+
+  return (
+    <View
+      style={[
+        qtyStyles.container,
+        { backgroundColor: colors.backgroundTertiary },
+        compact && qtyStyles.containerCompact,
+      ]}
+    >
+      <AppPressable
+        onPress={onDecrement}
+        disabled={disabledDec}
+        accessibilityRole='button'
+        accessibilityLabel='Restar uno'
+        style={[qtyStyles.btn, compact && qtyStyles.btnCompact]}
+      >
+        <Minus
+          size={compact ? 12 : 14}
+          pointerEvents='none'
+          color={disabledDec ? colors.textTertiary : colors.textOnSurface}
+          strokeWidth={2.4}
+        />
+      </AppPressable>
+      <Text
+        style={[
+          qtyStyles.value,
+          { color: colors.textOnSurface },
+          compact && qtyStyles.valueCompact,
+        ]}
+      >
+        {quantity}
+      </Text>
+      <AppPressable
+        onPress={onIncrement}
+        accessibilityRole='button'
+        accessibilityLabel='Sumar uno'
+        style={[qtyStyles.btn, compact && qtyStyles.btnCompact]}
+      >
+        <Plus
+          size={compact ? 12 : 14}
+          pointerEvents='none'
+          color={colors.textOnSurface}
+          strokeWidth={2.4}
+        />
+      </AppPressable>
+    </View>
+  );
+}
+
+const checkboxStyles = StyleSheet.create({
+  box: {
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
+
+const qtyStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 10,
+    padding: 2,
+  },
+  containerCompact: {
+    borderRadius: 8,
+    padding: 1,
+  },
+  btn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  btnCompact: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  value: {
+    fontSize: 14,
+    fontWeight: '700',
+    minWidth: 22,
+    textAlign: 'center',
+  },
+  valueCompact: {
+    fontSize: 13,
+    minWidth: 16,
+  },
+});
+
 const listStyles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    gap: 8,
-  },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
+    gap: 10,
   },
   name: {
     flex: 1,
     fontSize: 14,
-    fontWeight: '500',
-  },
-  qtyWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  qty: {
-    fontSize: 13,
-    fontWeight: '700',
-    minWidth: 16,
-    textAlign: 'center',
+    fontWeight: '600',
   },
   priceCol: {
     alignItems: 'flex-end',
-    minWidth: 60,
+    minWidth: 64,
   },
   pricePrimary: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '800',
   },
   priceSecondary: {
     fontSize: 10,
-    fontWeight: '400',
+    fontWeight: '500',
   },
   iconBtn: {
     padding: 4,
   },
 });
 
-/* ── Grid (card) view styles ──────────────────────────── */
 const gridStyles = StyleSheet.create({
   container: {
     padding: 14,
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
     gap: 12,
   },
@@ -529,25 +560,18 @@ const gridStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   info: {
     flex: 1,
     gap: 2,
   },
   name: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: -0.1,
   },
   unitPrice: {
     fontSize: 12,
-    fontWeight: '400',
+    fontWeight: '500',
   },
   totals: {
     alignItems: 'flex-end',
@@ -555,36 +579,18 @@ const gridStyles = StyleSheet.create({
   },
   totalPrimary: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   totalSecondary: {
     fontSize: 11,
-    fontWeight: '400',
+    fontWeight: '500',
   },
   actionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingLeft: 34,
-  },
-  quantityGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  qtyBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  qtyBtnPressed: {
-    opacity: 0.6,
-  },
-  qtyText: {
-    fontSize: 14,
-    fontWeight: '700',
-    minWidth: 20,
-    textAlign: 'center',
   },
   actionButtons: {
     flexDirection: 'row',

@@ -1,10 +1,10 @@
 import { useAuthStore } from '@/shared/infrastructure/auth/auth.store';
 import { setFcmToken } from '@/shared/infrastructure/device/device';
-import { usePushNotificationStore } from '@/shared/infrastructure/notifications/push-notification.store';
 import notifee, {
   AndroidImportance,
   EventType,
 } from '@/shared/infrastructure/notifications/notifee-shim';
+import { usePushNotificationStore } from '@/shared/infrastructure/notifications/push-notification.store';
 import {
   getInitialNotification,
   getMessaging,
@@ -87,7 +87,9 @@ export function usePushNotifications() {
 
       const data = remoteMessage.data ?? {};
       await notifee.displayNotification({
-        title: String(data.title ?? remoteMessage.notification?.title ?? 'Kashy'),
+        title: String(
+          data.title ?? remoteMessage.notification?.title ?? 'Kashy',
+        ),
         body: String(data.body ?? remoteMessage.notification?.body ?? ''),
         data,
         android: {

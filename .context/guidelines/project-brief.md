@@ -5,27 +5,27 @@
 
 ## 🛠 TECH STACK
 
-| COMPONENTE       | TECNOLOGÍA               | NOTAS                        |
-| :--------------- | :----------------------- | :--------------------------- |
-| **Framework**    | React Native             | Clean Architecture           |
-| **UI**           | shadcn                   | Componentes reutilizables    |
-| **Estado**       | Zustand                  | Store global                 |
-| **Persistencia** | AsyncStorage             | Datos locales y modo guest   |
-| **Auth**         | Firebase Authentication  | Email/password + Google      |
-| **Push**         | Firebase Cloud Messaging | Notificaciones iOS & Android |
-| **Navegación**   | React Navigation         | Bottom tabs + stack          |
+| COMPONENTE       | TECNOLOGÍA               | NOTAS                                                |
+| :--------------- | :----------------------- | :--------------------------------------------------- |
+| **Framework**    | React Native             | Clean Architecture                                   |
+| **UI**           | shadcn                   | Componentes reutilizables                            |
+| **Estado**       | Zustand                  | Store global                                         |
+| **Persistencia** | expo-secure-store        | Sesión, prefs y modo guest (wrapper `secureStorage`) |
+| **Auth**         | Firebase Authentication  | Email/password + Google                              |
+| **Push**         | Firebase Cloud Messaging | Notificaciones iOS & Android                         |
+| **Navegación**   | React Navigation         | Bottom tabs + stack                                  |
 
 ## 🎯 MVP SCOPE & RULES
 
 ### ALCANCE (IN-SCOPE)
 
-| FEATURE            | DETALLE                                                                                      |
-| :----------------- | :------------------------------------------------------------------------------------------- |
-| **Auth/Perfil**    | Registro, login, Google, cambio y restablecimiento de contraseña.                            |
-| **Dashboard**      | Balance neto, ingresos, egresos, próximos 3 vencimientos, notificaciones, toggle light/dark. |
-| **Finanzas**       | Registro de ingresos/egresos, recordatorios, automatización de fijos.                        |
-| **Listas**         | Creación, edición, eliminación. Comparaciones entre listas.                                  |
-| **Notificaciones** | Recepción push iOS/Android vía FCM. Configuración desde perfil.                              |
+| FEATURE            | DETALLE                                                                                                                                                                      |
+| :----------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Auth/Perfil**    | Registro, login, Google, cambio y restablecimiento de contraseña.                                                                                                            |
+| **Dashboard**      | Balance neto, ingresos, egresos, próximos 3 vencimientos, notificaciones, toggle light/dark.                                                                                 |
+| **Finanzas**       | Registro de ingresos/egresos, recordatorios, automatización de fijos.                                                                                                        |
+| **Listas**         | Ciclo Borrador (TEMPLATE) → Compra activa (RECEIPT) → Recibo (COMPLETED). Edición, eliminación, comparación. Guest local con cap de 2 listas + sync automática al loguearse. |
+| **Notificaciones** | Recepción push iOS/Android vía FCM. Configuración desde perfil.                                                                                                              |
 
 ### FUERA DE ALCANCE (OUT-SCOPE)
 
@@ -35,12 +35,12 @@
 
 ### NAVEGACIÓN
 
-| TAB          | DESCRIPCIÓN                                                       |
-| :----------- | :---------------------------------------------------------------- |
-| **Home**     | Dashboard principal. Balance, vencimientos, notificaciones, tema. |
-| **Compras**  | Listas de compras. Guest crea pero no guarda.                     |
-| **Finanzas** | Ingresos y egresos. Guest solo visualiza.                         |
-| **Perfil**   | Datos de cuenta o invitado. Config de notificaciones.             |
+| TAB          | DESCRIPCIÓN                                                          |
+| :----------- | :------------------------------------------------------------------- |
+| **Home**     | Dashboard principal. Balance, vencimientos, notificaciones, tema.    |
+| **Compras**  | Listas de compras. Guest crea y guarda local (máx 2); sync al login. |
+| **Finanzas** | Ingresos y egresos. Guest solo visualiza.                            |
+| **Perfil**   | Datos de cuenta o invitado. Config de notificaciones.                |
 
 ### ROLES DE USUARIO
 
@@ -54,6 +54,6 @@
 1. **Región**: Venezuela únicamente para fase de prueba antes de salir al mercado.
 2. **Predicción**: El valor diferencial es el control predictivo, no solo el registro histórico.
 3. **Automatización**: Los ingresos/egresos fijos se registran automáticamente según programación del usuario.
-4. **Guest local**: Ningún dato del guest llega al backend. Todo vive en AsyncStorage.
+4. **Guest local**: Ningún dato del guest llega al backend mientras es invitado. Todo vive en `expo-secure-store`. Al loguearse se promueve via `syncGuestData` (auto, silencioso).
 5. **Modal de login**: Toda acción bloqueada del guest dispara el modal contextualmente, nunca un error genérico.
 6. **Tema**: Toggle light/dark disponible en Dashboard y Perfil.

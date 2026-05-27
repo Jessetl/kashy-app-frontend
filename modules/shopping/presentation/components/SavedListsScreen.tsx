@@ -1,9 +1,17 @@
+import { AlertDialog } from '@/shared/presentation/components/ui/alert-dialog';
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useAuth } from '@/shared/presentation/hooks/auth/use-auth';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { useRouter } from 'expo-router';
-import { FolderOpen, Plus, ShoppingBag } from 'lucide-react-native';
-import React, { useCallback, useMemo, useState } from 'react';
+import {
+  CloudOff,
+  FolderOpen,
+  Plus,
+  ReceiptText,
+  ShoppingBasket,
+  Sparkles,
+} from 'lucide-react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -11,7 +19,6 @@ import {
   StyleSheet,
   Text,
   View,
-  type ListRenderItem,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type {
@@ -19,34 +26,39 @@ import type {
   ShoppingListSummary,
 } from '../../domain/entities/shopping-list-summary.entity';
 import type { ShoppingListType } from '../../domain/entities/shopping-list.entity';
-import { useShoppingStore } from '../store/useShoppingStore';
+import { CompareSelectionBar } from '../components/CompareSelectionBar';
 import { SavedListSummaryCard } from '../components/SavedListSummaryCard';
 import { useSavedLists } from '../hooks/useSavedLists';
+import { useShoppingStore } from '../store/useShoppingStore';
 
-type TypeChip = 'ALL' | ShoppingListType;
-type ActiveChip = 'ALL' | 'ACTIVE' | 'ARCHIVED';
+type ShoppingTab = ShoppingListType;
 
-const TYPE_CHIPS: { key: TypeChip; label: string }[] = [
-  { key: 'ALL', label: 'Todas' },
-  { key: 'TEMPLATE', label: 'Plantillas' },
-  { key: 'RECEIPT', label: 'Recibos' },
-];
+const TAB_ORDER: ShoppingTab[] = ['TEMPLATE', 'RECEIPT', 'COMPLETED'];
 
-const STATUS_CHIPS: { key: ActiveChip; label: string }[] = [
-  { key: 'ALL', label: 'Cualquier estado' },
-  { key: 'ACTIVE', label: 'Activas' },
-  { key: 'ARCHIVED', label: 'Archivadas' },
-];
+/** Flow 3 — cap de listas locales en modo invitado. */
+const GUEST_MAX_LISTS = 2;
+
+interface TabConfig {
+  key: ShoppingTab;
+  label: string;
+  /** Color clave del tab activo. */
+  accent: 'primary' | 'success';
+}
+
+const TAB_CONFIG: Record<ShoppingTab, TabConfig> = {
+  TEMPLATE: { key: 'TEMPLATE', label: 'Borradores', accent: 'primary' },
+  RECEIPT: { key: 'RECEIPT', label: 'Activas', accent: 'success' },
+  COMPLETED: { key: 'COMPLETED', label: 'Completadas', accent: 'primary' },
+};
 
 export function SavedListsScreen() {
-  const { colors, isDark } = useAppTheme();
+  const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { isAuthenticated: isAuth, openLoginModal } = useAuth();
 
   const {
     summaries,
-    meta,
     isLoading,
     isLoadingMore,
     isAuthenticated,
@@ -56,37 +68,66 @@ export function SavedListsScreen() {
 
   const setActiveList = useShoppingStore((s) => s.setActiveList);
   const storeLists = useShoppingStore((s) => s.lists);
-  const createList = useShoppingStore((s) => s.createList);
+  const createDraft = useShoppingStore((s) => s.createDraft);
+  const deleteList = useShoppingStore((s) => s.deleteList);
 
-  const headerForegroundColor = isDark ? colors.textOnSurface : '#FFFFFF';
+  // Multi-select state (Flow 13).
+  const selectionMode = useShoppingStore((s) => s.selectionMode);
+  const selectedIds = useShoppingStore((s) => s.selectedIds);
+  const enterSelectionMode = useShoppingStore((s) => s.enterSelectionMode);
+  const toggleSelected = useShoppingStore((s) => s.toggleSelected);
+  const exitSelectionMode = useShoppingStore((s) => s.exitSelectionMode);
 
-  const [typeFilter, setTypeFilter] = useState<TypeChip>('ALL');
-  const [statusFilter, setStatusFilter] = useState<ActiveChip>('ACTIVE');
+  const isOnline = useShoppingStore((s) => s.isOnline);
 
-  const applyFilters = useCallback(
-    (nextType: TypeChip, nextStatus: ActiveChip) => {
-      const filters: ShoppingListSearchFilters = {};
-      if (nextType !== 'ALL') filters.listType = nextType;
-      if (nextStatus !== 'ALL') filters.isActive = nextStatus === 'ACTIVE';
+  const [activeTab, setActiveTab] = useState<ShoppingTab>('TEMPLATE');
+
+  // Delete confirm (Flow 14).
+  const [pendingDelete, setPendingDelete] =
+    useState<ShoppingListSummary | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Flow 3 — guest cap alert.
+  const [showGuestLimitAlert, setShowGuestLimitAlert] = useState(false);
+
+  const guestListsCount = useMemo(
+    () => storeLists.filter((l) => l.id.startsWith('local-')).length,
+    [storeLists],
+  );
+
+  const handleRequestDelete = useCallback(
+    (summary: ShoppingListSummary) => {
+      // Evita doble apertura mientras un delete está en curso (Flow 14 edge case).
+      if (isDeleting) return;
+      setPendingDelete(summary);
+    },
+    [isDeleting],
+  );
+
+  const handleCancelDelete = useCallback(() => {
+    setPendingDelete(null);
+  }, []);
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!pendingDelete) return;
+    setIsDeleting(true);
+    try {
+      await deleteList(pendingDelete.id);
+    } finally {
+      setIsDeleting(false);
+      setPendingDelete(null);
+    }
+  }, [pendingDelete, deleteList]);
+
+  const handleTabChange = useCallback(
+    (tab: ShoppingTab) => {
+      // Cambio de tab → salir de modo selección si estaba activo.
+      if (selectionMode) exitSelectionMode();
+      setActiveTab(tab);
+      const filters: ShoppingListSearchFilters = { listType: tab };
       void reload(filters);
     },
-    [reload],
-  );
-
-  const handleTypeSelect = useCallback(
-    (key: TypeChip) => {
-      setTypeFilter(key);
-      applyFilters(key, statusFilter);
-    },
-    [applyFilters, statusFilter],
-  );
-
-  const handleStatusSelect = useCallback(
-    (key: ActiveChip) => {
-      setStatusFilter(key);
-      applyFilters(typeFilter, key);
-    },
-    [applyFilters, typeFilter],
+    [reload, selectionMode, exitSelectionMode],
   );
 
   const goToEditor = useCallback(
@@ -97,111 +138,163 @@ export function SavedListsScreen() {
   );
 
   const handleCreateTemplate = useCallback(() => {
-    const run = async () => {
-      await createList('Nueva plantilla');
-      const newId = useShoppingStore.getState().activeList?.id;
-      if (newId) {
-        goToEditor(newId);
-      }
-    };
-
-    if (!isAuth) {
-      openLoginModal(() => void run());
+    if (!isAuthenticated && guestListsCount >= GUEST_MAX_LISTS) {
+      setShowGuestLimitAlert(true);
       return;
     }
-    void run();
-  }, [createList, goToEditor, isAuth, openLoginModal]);
+    createDraft();
+    const newId = useShoppingStore.getState().activeList?.id;
+    if (newId) goToEditor(newId);
+  }, [createDraft, goToEditor, isAuthenticated, guestListsCount]);
+
+  const handleGuestLimitLogin = useCallback(() => {
+    setShowGuestLimitAlert(false);
+    openLoginModal();
+  }, [openLoginModal]);
 
   const handleSelect = useCallback(
     (summary: ShoppingListSummary) => {
+      // En modo selección: tap toggles en lugar de navegar.
+      if (selectionMode) {
+        // Solo cards COMPLETED son seleccionables.
+        if (summary.listType !== 'COMPLETED') return;
+        toggleSelected(summary.id);
+        return;
+      }
       const existing =
         storeLists.find((l) => l.id === summary.id) ?? summaryStub(summary);
       setActiveList(existing);
       goToEditor(summary.id);
     },
-    [setActiveList, storeLists, goToEditor],
+    [selectionMode, toggleSelected, setActiveList, storeLists, goToEditor],
   );
 
-  const renderItem = useCallback<ListRenderItem<ShoppingListSummary>>(
-    ({ item }) => (
-      <SavedListSummaryCard summary={item} onPress={handleSelect} />
-    ),
-    [handleSelect],
+  const handleLongPress = useCallback(
+    (summary: ShoppingListSummary) => {
+      // Solo en tab Recibos y solo auth (Flow 13).
+      if (!isAuthenticated) return;
+      if (summary.listType !== 'COMPLETED') return;
+      if (!selectionMode) {
+        enterSelectionMode(summary.id);
+      } else {
+        toggleSelected(summary.id);
+      }
+    },
+    [isAuthenticated, selectionMode, enterSelectionMode, toggleSelected],
   );
 
-  const keyExtractor = useCallback(
-    (item: ShoppingListSummary) => item.id,
-    [],
+  const handleCompare = useCallback(() => {
+    if (selectedIds.length !== 2) return;
+    const [aId, bId] = selectedIds;
+    exitSelectionMode();
+    router.push(`/shopping/compare?aId=${aId}&bId=${bId}`);
+  }, [selectedIds, router, exitSelectionMode]);
+
+  const filteredSummaries = useMemo(
+    () => summaries.filter((s) => s.listType === activeTab),
+    [summaries, activeTab],
   );
 
-  const handleEndReached = useCallback(() => void loadMore(), [loadMore]);
-  const handleRefresh = useCallback(() => void reload(), [reload]);
+  const handleRefresh = useCallback(() => {
+    if (selectionMode) exitSelectionMode();
+    void reload({ listType: activeTab });
+  }, [reload, activeTab, selectionMode, exitSelectionMode]);
 
-  const totalLabel = useMemo(() => {
-    if (meta.total === 0) return null;
-    return `${meta.total} ${meta.total === 1 ? 'lista' : 'listas'}`;
-  }, [meta.total]);
+  const handleEndReached = useCallback(() => {
+    if (!isAuthenticated) return;
+    if (isLoading || isLoadingMore) return;
+    void loadMore();
+  }, [isAuthenticated, isLoading, isLoadingMore, loadMore]);
+
+  // Cleanup: salir de modo selección al desmontar.
+  useEffect(() => {
+    return () => {
+      if (useShoppingStore.getState().selectionMode) {
+        useShoppingStore.getState().exitSelectionMode();
+      }
+    };
+  }, []);
+
+  const showOfflineBanner = isAuthenticated && !isOnline;
+
+  const listHeader = (
+    <View style={[styles.headerContent, { paddingTop: insets.top + 16 }]}>
+      <View>
+        <Text style={[styles.title, { color: colors.text }]}>Compras</Text>
+        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+          Planifica tus borradores y guarda tus recibos de compra
+        </Text>
+      </View>
+
+      {!isAuth ? (
+        <View style={styles.guestBadge}>
+          <CloudOff
+            size={12}
+            color='rgba(255,255,255,0.85)'
+            strokeWidth={2.2}
+          />
+          <Text style={styles.guestBadgeText}>Modo invitado</Text>
+        </View>
+      ) : null}
+
+      {showOfflineBanner ? (
+        <View
+          style={[
+            styles.offlineBanner,
+            { backgroundColor: colors.warningLight },
+          ]}
+        >
+          <CloudOff size={14} color={colors.warning} strokeWidth={2.2} />
+          <Text style={[styles.offlineBannerText, { color: colors.warning }]}>
+            Sin conexión — mostrando datos sincronizados localmente
+          </Text>
+        </View>
+      ) : null}
+
+      <ShoppingTabSelector
+        activeTab={activeTab}
+        onTabChange={handleTabChange}
+      />
+    </View>
+  );
 
   return (
-    <View
-      style={[
-        styles.flex,
-        { backgroundColor: colors.background, paddingTop: insets.top },
-      ]}
-    >
-      <View style={styles.header}>
-        <View style={styles.headerTextContainer}>
-          <Text style={[styles.title, { color: headerForegroundColor }]}>
-            Supermercado
-          </Text>
-          {totalLabel ? (
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {totalLabel}
-            </Text>
-          ) : (
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Tus plantillas y recibos
-            </Text>
-          )}
-        </View>
-        <AppPressable
-          onPress={handleCreateTemplate}
-          style={[styles.newButton, { backgroundColor: colors.primary }]}
-        >
-          <Plus size={16} color={colors.textInverse} strokeWidth={2.5} />
-          <Text style={[styles.newButtonText, { color: colors.textInverse }]}>
-            Nueva
-          </Text>
-        </AppPressable>
-      </View>
-
-      <View style={styles.filtersSection}>
-        <FilterRow
-          chips={TYPE_CHIPS}
-          activeKey={typeFilter}
-          onSelect={handleTypeSelect}
-        />
-        <FilterRow
-          chips={STATUS_CHIPS}
-          activeKey={statusFilter}
-          onSelect={handleStatusSelect}
-        />
-      </View>
-
+    <View style={[styles.flex, { backgroundColor: colors.background }]}>
       <FlatList
-        data={summaries}
-        renderItem={renderItem}
+        data={filteredSummaries}
         keyExtractor={keyExtractor}
+        renderItem={({ item }) => (
+          <SavedListSummaryCard
+            summary={item}
+            onPress={handleSelect}
+            onLongPress={
+              isAuthenticated && item.listType === 'COMPLETED'
+                ? handleLongPress
+                : undefined
+            }
+            selectionMode={selectionMode && item.listType === 'COMPLETED'}
+            isSelected={selectedIds.includes(item.id)}
+            onDelete={selectionMode ? undefined : handleRequestDelete}
+          />
+        )}
+        ListHeaderComponent={listHeader}
         contentContainerStyle={[
           styles.listContent,
-          summaries.length === 0 && styles.emptyContent,
+          {
+            paddingBottom: insets.bottom + (selectionMode ? 90 : 100),
+            backgroundColor: colors.backgroundSecondary,
+          },
         ]}
-        ItemSeparatorComponent={ItemSeparator}
+        ItemSeparatorComponent={Separator}
         ListEmptyComponent={
-          isLoading ? null : (
+          isLoading && filteredSummaries.length === 0 ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size='large' color={colors.primary} />
+            </View>
+          ) : (
             <EmptyState
+              activeTab={activeTab}
               isAuthenticated={isAuthenticated}
-              onCreateTemplate={handleCreateTemplate}
             />
           )
         }
@@ -216,13 +309,126 @@ export function SavedListsScreen() {
         onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
+            refreshing={isLoading && filteredSummaries.length > 0}
             onRefresh={handleRefresh}
             tintColor={colors.primary}
           />
         }
         showsVerticalScrollIndicator={false}
       />
+
+      {selectionMode ? (
+        <CompareSelectionBar
+          count={selectedIds.length}
+          max={2}
+          isOnline={isOnline}
+          onCancel={exitSelectionMode}
+          onCompare={handleCompare}
+        />
+      ) : (
+        <AppPressable
+          onPress={handleCreateTemplate}
+          accessibilityRole='button'
+          accessibilityLabel='Crear nueva lista'
+          style={[
+            styles.fab,
+            {
+              backgroundColor: colors.primary,
+              bottom: insets.bottom + 20,
+            },
+          ]}
+        >
+          <Plus size={24} color={colors.textInverse} pointerEvents='none' />
+        </AppPressable>
+      )}
+
+      <AlertDialog
+        visible={pendingDelete !== null}
+        onClose={handleCancelDelete}
+        tone='danger'
+        title={
+          pendingDelete
+            ? `Eliminar lista "${pendingDelete.name}"`
+            : 'Eliminar lista'
+        }
+        message='Esta acción no se puede deshacer. La lista y sus productos se eliminarán de forma permanente.'
+        actions={[
+          { label: 'Cancelar', variant: 'cancel', onPress: handleCancelDelete },
+          {
+            label: 'Eliminar',
+            variant: 'destructive',
+            onPress: () => void handleConfirmDelete(),
+          },
+        ]}
+      />
+
+      <AlertDialog
+        visible={showGuestLimitAlert}
+        onClose={() => setShowGuestLimitAlert(false)}
+        tone='info'
+        title={`Máximo ${GUEST_MAX_LISTS} listas en modo invitado`}
+        message='Inicia sesión para crear listas ilimitadas y sincronizarlas en todos tus dispositivos.'
+        actions={[
+          { label: 'Cancelar', variant: 'cancel' },
+          { label: 'Iniciar sesión', onPress: handleGuestLimitLogin },
+        ]}
+      />
+    </View>
+  );
+}
+
+function keyExtractor(item: ShoppingListSummary): string {
+  return item.id;
+}
+
+function Separator() {
+  return <View style={styles.separator} />;
+}
+
+function ShoppingTabSelector({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab: ShoppingTab;
+  onTabChange: (tab: ShoppingTab) => void;
+}) {
+  const { colors } = useAppTheme();
+
+  const colorFor = (accent: TabConfig['accent']): string => colors[accent];
+
+  return (
+    <View
+      style={[
+        tabStyles.container,
+        { backgroundColor: colors.backgroundSecondary },
+      ]}
+    >
+      {TAB_ORDER.map((tabKey) => {
+        const cfg = TAB_CONFIG[tabKey];
+        const isActive = activeTab === tabKey;
+        return (
+          <AppPressable
+            key={cfg.key}
+            onPress={() => onTabChange(cfg.key)}
+            style={[
+              tabStyles.tab,
+              isActive && { backgroundColor: colorFor(cfg.accent) },
+            ]}
+          >
+            <Text
+              numberOfLines={1}
+              style={[
+                tabStyles.tabText,
+                {
+                  color: isActive ? colors.textInverse : colors.textSecondary,
+                },
+              ]}
+            >
+              {cfg.label}
+            </Text>
+          </AppPressable>
+        );
+      })}
     </View>
   );
 }
@@ -254,169 +460,143 @@ function summaryStub(s: ShoppingListSummary) {
   };
 }
 
-function ItemSeparator() {
-  return <View style={styles.separator} />;
-}
-
 function EmptyState({
+  activeTab,
   isAuthenticated,
-  onCreateTemplate,
 }: {
+  activeTab: ShoppingTab;
   isAuthenticated: boolean;
-  onCreateTemplate: () => void;
 }) {
   const { colors } = useAppTheme();
+
+  const Icon =
+    activeTab === 'TEMPLATE'
+      ? Sparkles
+      : activeTab === 'RECEIPT'
+        ? ShoppingBasket
+        : activeTab === 'COMPLETED'
+          ? ReceiptText
+          : FolderOpen;
+
+  const title =
+    activeTab === 'TEMPLATE'
+      ? isAuthenticated
+        ? 'Sin borradores guardados'
+        : 'Crea tu primera lista'
+      : activeTab === 'RECEIPT'
+        ? 'No hay compras activas'
+        : 'Aún no hay recibos';
+
+  const message =
+    activeTab === 'TEMPLATE'
+      ? isAuthenticated
+        ? 'Crea un borrador para planificar tu compra. Cuando vayas al supermercado, conviértelo en compra activa para registrar precios.'
+        : 'Empieza una lista local — sin cuenta. Cuando inicies sesión sincronizaremos tus borradores automáticamente.'
+      : activeTab === 'RECEIPT'
+        ? 'Convierte un borrador en compra activa desde su pantalla de detalle para registrar precios y marcar productos.'
+        : 'Finaliza una compra activa para guardarla como recibo y poder compararla con otras.';
+
   return (
     <View style={styles.emptyContainer}>
       <View
         style={[
           styles.emptyIcon,
-          { backgroundColor: colors.backgroundTertiary },
+          {
+            backgroundColor: colors.primaryLight,
+            borderColor: colors.primary,
+          },
         ]}
       >
-        {isAuthenticated ? (
-          <FolderOpen size={32} color={colors.textTertiary} strokeWidth={1.5} />
-        ) : (
-          <ShoppingBag
-            size={32}
-            color={colors.textTertiary}
-            strokeWidth={1.5}
-          />
-        )}
+        <Icon size={40} color={colors.primary} pointerEvents='none' />
       </View>
       <Text style={[styles.emptyTitle, { color: colors.textOnSurface }]}>
-        {isAuthenticated ? 'Sin listas guardadas' : 'Inicia sesión'}
+        {title}
       </Text>
       <Text style={[styles.emptyMessage, { color: colors.textSecondary }]}>
-        {isAuthenticated
-          ? 'Crea una plantilla para reutilizar en cada compra. Cuando vayas al supermercado conviértela en recibo y agrega los precios.'
-          : 'Para guardar y sincronizar listas necesitas una cuenta.'}
+        {message}
       </Text>
-      <AppPressable
-        onPress={onCreateTemplate}
-        style={[styles.emptyCta, { backgroundColor: colors.primary }]}
-      >
-        <Plus size={16} color={colors.textInverse} strokeWidth={2.5} />
-        <Text style={[styles.emptyCtaText, { color: colors.textInverse }]}>
-          Crear plantilla
-        </Text>
-      </AppPressable>
     </View>
   );
 }
 
-interface FilterRowProps<T extends string> {
-  chips: { key: T; label: string }[];
-  activeKey: T;
-  onSelect: (key: T) => void;
-}
-
-function FilterRow<T extends string>({
-  chips,
-  activeKey,
-  onSelect,
-}: FilterRowProps<T>) {
-  const { colors } = useAppTheme();
-  return (
-    <View style={styles.filterRow}>
-      {chips.map((chip) => {
-        const active = chip.key === activeKey;
-        return (
-          <AppPressable
-            key={chip.key}
-            onPress={() => onSelect(chip.key)}
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor: active
-                  ? colors.primary
-                  : colors.backgroundSecondary,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                {
-                  color: active ? colors.textInverse : colors.textOnSurface,
-                },
-              ]}
-            >
-              {chip.label}
-            </Text>
-          </AppPressable>
-        );
-      })}
-    </View>
-  );
-}
+const tabStyles = StyleSheet.create({
+  container: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+});
 
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  listContent: {
+    flexGrow: 1,
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
   },
-  headerTextContainer: {
-    flex: 1,
-    gap: 2,
+  headerContent: {
+    paddingHorizontal: 4,
+    gap: 14,
+    paddingBottom: 16,
   },
   title: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: '700',
-    letterSpacing: -0.3,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 13,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '400',
+    marginTop: 2,
   },
-  newButton: {
+  guestBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.12)',
   },
-  newButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-  },
-  filtersSection: {
-    paddingHorizontal: 16,
-    gap: 8,
-    paddingBottom: 8,
-  },
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-  },
-  filterChipText: {
-    fontSize: 13,
+  guestBadgeText: {
+    fontSize: 12,
     fontWeight: '600',
+    color: 'rgba(255,255,255,0.92)',
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 32,
-    gap: 10,
+  offlineBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
-  emptyContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
+  offlineBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    flex: 1,
   },
   separator: {
-    height: 10,
+    height: 12,
+  },
+  loadingContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
   },
   footerLoader: {
     paddingVertical: 16,
@@ -425,37 +605,42 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 32,
+    paddingVertical: 60,
+    paddingHorizontal: 24,
     gap: 12,
   },
   emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
+    textAlign: 'center',
   },
   emptyMessage: {
     fontSize: 14,
+    fontWeight: '400',
     textAlign: 'center',
     lineHeight: 20,
   },
-  emptyCta: {
-    marginTop: 8,
-    flexDirection: 'row',
+  fab: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 999,
-  },
-  emptyCtaText: {
-    fontSize: 14,
-    fontWeight: '700',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
 });

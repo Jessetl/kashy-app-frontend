@@ -1,6 +1,6 @@
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
-import { Eraser, LayoutGrid, List } from 'lucide-react-native';
+import { LayoutGrid, List } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -17,76 +17,83 @@ export const ViewToggle = React.memo(function ViewToggle({
   mode,
   onToggle,
   itemCount,
-  onNewList,
 }: ViewToggleProps) {
   const colors = useThemeColors();
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.count, { color: colors.textOnSurface }]}>
-        {itemCount} producto{itemCount !== 1 ? 's' : ''}
-      </Text>
-      <View style={styles.toggleGroup}>
-        {onNewList && (
-          <AppPressable
-            onPress={onNewList}
-            style={[
-              styles.toggleButton,
-              {
-                backgroundColor: colors.backgroundTertiary,
-                borderColor: colors.border,
-              },
-            ]}
+      <View style={styles.counterGroup}>
+        <Text style={[styles.count, { color: colors.textOnSurface }]}>
+          {itemCount}
+        </Text>
+        <Text style={[styles.countLabel, { color: colors.textSecondary }]}>
+          producto{itemCount !== 1 ? 's' : ''}
+        </Text>
+      </View>
+      <View style={styles.actions}>
+        <View
+          style={[
+            styles.segmented,
+            { backgroundColor: colors.backgroundTertiary },
+          ]}
+        >
+          <SegmentedItem
+            active={mode === 'grid'}
+            onPress={() => onToggle('grid')}
+            label='Cuadrícula'
           >
-            <Eraser
+            <LayoutGrid
               pointerEvents='none'
-              size={16}
-              color={colors.textSecondary}
+              size={15}
+              color={mode === 'grid' ? colors.textInverse : colors.textSecondary}
+              strokeWidth={2.2}
             />
-          </AppPressable>
-        )}
-        <AppPressable
-          onPress={() => onToggle('grid')}
-          style={[
-            styles.toggleButton,
-            {
-              backgroundColor:
-                mode === 'grid'
-                  ? colors.primaryLight
-                  : colors.backgroundTertiary,
-              borderColor: mode === 'grid' ? colors.primary : colors.border,
-            },
-          ]}
-        >
-          <LayoutGrid
-            pointerEvents='none'
-            size={16}
-            color={mode === 'grid' ? colors.primary : colors.textSecondary}
-          />
-        </AppPressable>
-        <AppPressable
-          onPress={() => onToggle('list')}
-          style={[
-            styles.toggleButton,
-            {
-              backgroundColor:
-                mode === 'list'
-                  ? colors.primaryLight
-                  : colors.backgroundTertiary,
-              borderColor: mode === 'list' ? colors.primary : colors.border,
-            },
-          ]}
-        >
-          <List
-            pointerEvents='none'
-            size={16}
-            color={mode === 'list' ? colors.primary : colors.textSecondary}
-          />
-        </AppPressable>
+          </SegmentedItem>
+          <SegmentedItem
+            active={mode === 'list'}
+            onPress={() => onToggle('list')}
+            label='Lista'
+          >
+            <List
+              pointerEvents='none'
+              size={15}
+              color={mode === 'list' ? colors.textInverse : colors.textSecondary}
+              strokeWidth={2.2}
+            />
+          </SegmentedItem>
+        </View>
       </View>
     </View>
   );
 });
+
+function SegmentedItem({
+  active,
+  onPress,
+  label,
+  children,
+}: {
+  active: boolean;
+  onPress: () => void;
+  label: string;
+  children: React.ReactNode;
+}) {
+  const colors = useThemeColors();
+  return (
+    <AppPressable
+      onPress={onPress}
+      accessibilityRole='button'
+      accessibilityState={{ selected: active }}
+      accessibilityLabel={label}
+      style={[
+        styles.segmentedItem,
+        active && { backgroundColor: colors.primary },
+      ]}
+    >
+      {children}
+    </AppPressable>
+  );
+}
 
 const styles = StyleSheet.create({
   container: {
@@ -95,20 +102,36 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 12,
   },
+  counterGroup: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 5,
+  },
   count: {
-    fontSize: 14,
+    fontSize: 18,
+    fontWeight: '800',
+    letterSpacing: -0.3,
+  },
+  countLabel: {
+    fontSize: 13,
     fontWeight: '500',
   },
-  toggleGroup: {
+  actions: {
     flexDirection: 'row',
-    gap: 6,
+    alignItems: 'center',
+    gap: 8,
   },
-  toggleButton: {
-    width: 36,
-    height: 36,
+  segmented: {
+    flexDirection: 'row',
     borderRadius: 10,
+    padding: 2,
+  },
+  segmentedItem: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    minWidth: 36,
   },
 });

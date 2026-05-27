@@ -33,6 +33,8 @@ Toda IA que trabaje en este proyecto **debe** seguir esta secuencia:
 │       ├── shopping-lists.md
 │       ├── finances.md
 │       └── notifications.md
+├── flows/
+│   └── shopping-lists.md
 └── skills/
     ├── react-native-clean-architecture/
     │   ├── SKILL.md
@@ -74,6 +76,16 @@ Toda IA que trabaje en este proyecto **debe** seguir esta secuencia:
 | **Shopping Lists** | `guidelines/router/shopping-lists.md` | Al implementar CRUD de listas de compras, items en batch o comparadora de métricas.                                                                                             |
 | **Finances**       | `guidelines/router/finances.md`       | Al implementar CRUD de ingresos/egresos, summary del dashboard o registros recurrentes.                                                                                         |
 | **Notifications**  | `guidelines/router/notifications.md`  | Al implementar listado de notificaciones, badge de no leídas, marcar como leída o preferencias.                                                                                 |
+
+---
+
+## 🌀 Flows — Flujos UX por dominio
+
+Documentos vivos que describen el comportamiento esperado de cada flujo de usuario (actores, pasos en Mermaid sequenceDiagram, tabla de estados y casos borde). Cada cambio de comportamiento UX debe reflejarse aquí.
+
+| Documento          | Ruta                         | Cuándo consultarlo                                                                                                                                                                                                                                                  |
+| :----------------- | :--------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Shopping Lists** | `flows/shopping-lists.md`    | Al modificar el módulo `modules/shopping` (FAB, draft, commit, salir sin guardar, convertir TEMPLATE→RECEIPT, marcar completada, sync guest→auth, reconexión offline). Incluye convenciones del módulo (modos, estados, tipos, tabs, límites) y 12 flujos completos. |
 
 ---
 
@@ -126,6 +138,7 @@ Las skills son guías reutilizables que aplican a cualquier proyecto. Definen **
 | Crear un use case                 | `architecture.md` → `command-patterns.md` o `query-patterns.md` según el tipo                                                          |
 | Crear/modificar un Zustand store  | `architecture.md` → `store-patterns.md`                                                                                                |
 | Conectar con un endpoint          | `api-routes.md` → `router/{servicio}.md` → `react-native-clean-architecture/SKILL.md`                                                  |
+| Modificar comportamiento UX del módulo Shopping | `flows/shopping-lists.md` → `router/shopping-lists.md` → `architecture.md`                                              |
 | Implementar lista con paginación  | `query-patterns.md` → `optimization-patterns.md` (FlashList)                                                                           |
 | Implementar formulario            | `rnr-ui-designer/references/ui-patterns.md` → `router/{servicio}.md`                                                                   |
 | Implementar modo guest            | `navigation-map.md` → `store-patterns.md` → `command-patterns.md`                                                                      |

@@ -3,9 +3,9 @@ import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
 import {
   ArrowLeft,
   Bookmark,
-  ReceiptText,
+  CheckCircle2,
   Share2,
-  Trash2,
+  ShoppingBag,
 } from 'lucide-react-native';
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -15,6 +15,7 @@ interface ListHeaderBarProps {
   onShare?: () => void;
   onSave?: () => void;
   onConvertToReceipt?: () => void;
+  onComplete?: () => void;
   onDelete?: () => void;
 }
 
@@ -23,44 +24,90 @@ export const ListHeaderBar = React.memo(function ListHeaderBar({
   onShare,
   onSave,
   onConvertToReceipt,
-  onDelete,
+  onComplete,
 }: ListHeaderBarProps) {
   const colors = useThemeColors();
   const iconColor = colors.text;
+  const buttonBg = 'rgba(255,255,255,0.10)';
+
+  const IconButton = ({
+    onPress,
+    children,
+    label,
+    bg,
+  }: {
+    onPress: () => void;
+    children: React.ReactNode;
+    label: string;
+    bg?: string;
+  }) => (
+    <AppPressable
+      onPress={onPress}
+      accessibilityRole='button'
+      accessibilityLabel={label}
+      style={[styles.iconButton, { backgroundColor: bg ?? buttonBg }]}
+    >
+      {children}
+    </AppPressable>
+  );
 
   return (
     <View style={styles.container}>
       {onBack ? (
-        <AppPressable onPress={onBack} style={styles.iconButton}>
-          <ArrowLeft pointerEvents='none' size={22} color={iconColor} />
-        </AppPressable>
+        <IconButton onPress={onBack} label='Volver' bg={buttonBg}>
+          <ArrowLeft pointerEvents='none' size={20} color={iconColor} />
+        </IconButton>
       ) : (
-        <View style={styles.iconButton} />
+        <View style={styles.iconPlaceholder} />
       )}
       <View style={styles.rightActions}>
-        {onConvertToReceipt && (
-          <AppPressable onPress={onConvertToReceipt} style={styles.iconButton}>
-            <ReceiptText
-              pointerEvents='none'
-              size={20}
-              color={colors.primary}
-            />
-          </AppPressable>
-        )}
         {onShare && (
-          <AppPressable onPress={onShare} style={styles.iconButton}>
-            <Share2 pointerEvents='none' size={20} color={iconColor} />
-          </AppPressable>
+          <IconButton onPress={onShare} label='Compartir'>
+            <Share2
+              pointerEvents='none'
+              size={18}
+              color={iconColor}
+              strokeWidth={2.2}
+            />
+          </IconButton>
+        )}
+        {onConvertToReceipt && (
+          <IconButton
+            onPress={onConvertToReceipt}
+            label='Convertir en compra'
+            bg={`${colors.success}33`}
+          >
+            <ShoppingBag
+              pointerEvents='none'
+              size={18}
+              color={colors.success}
+              strokeWidth={2.2}
+            />
+          </IconButton>
+        )}
+        {onComplete && (
+          <IconButton
+            onPress={onComplete}
+            label='Completar compra'
+            bg={`${colors.success}33`}
+          >
+            <CheckCircle2
+              pointerEvents='none'
+              size={18}
+              color={colors.success}
+              strokeWidth={2.4}
+            />
+          </IconButton>
         )}
         {onSave && (
-          <AppPressable onPress={onSave} style={styles.iconButton}>
-            <Bookmark pointerEvents='none' size={20} color={iconColor} />
-          </AppPressable>
-        )}
-        {onDelete && (
-          <AppPressable onPress={onDelete} style={styles.iconButton}>
-            <Trash2 pointerEvents='none' size={20} color={iconColor} />
-          </AppPressable>
+          <IconButton onPress={onSave} label='Guardar'>
+            <Bookmark
+              pointerEvents='none'
+              size={18}
+              color={iconColor}
+              strokeWidth={2.2}
+            />
+          </IconButton>
         )}
       </View>
     </View>
@@ -72,15 +119,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     height: 48,
   },
   rightActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 8,
   },
   iconButton: {
-    padding: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconPlaceholder: {
+    width: 36,
+    height: 36,
   },
 });

@@ -1,10 +1,10 @@
-import notifee, {
-  AndroidImportance,
-} from './shared/infrastructure/notifications/notifee-shim';
 import {
   getMessaging,
   setBackgroundMessageHandler,
 } from '@react-native-firebase/messaging';
+import notifee, {
+  AndroidImportance,
+} from './shared/infrastructure/notifications/notifee-shim';
 
 import 'expo-router/entry';
 

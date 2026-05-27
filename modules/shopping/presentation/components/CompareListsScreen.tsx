@@ -2,13 +2,8 @@ import { AppButton } from '@/shared/presentation/components/ui/app-button';
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useAppTheme } from '@/shared/presentation/hooks/use-app-theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  ArrowLeft,
-  ArrowLeftRight,
-  ScaleIcon,
-  XCircle,
-} from 'lucide-react-native';
-import React, { useEffect, useMemo } from 'react';
+import { ArrowLeft, ScaleIcon, XCircle } from 'lucide-react-native';
+import React, { useEffect } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -17,18 +12,16 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CompareListPicker } from '../components/CompareListPicker';
 import { CompareMatchedRow } from '../components/CompareMatchedRow';
 import { CompareSummaryCard } from '../components/CompareSummaryCard';
 import { CompareUnmatchedRow } from '../components/CompareUnmatchedRow';
 import { useCompareLists } from '../hooks/useCompareLists';
-import { useSavedLists } from '../hooks/useSavedLists';
 
 export function CompareListsScreen() {
   const { colors, isDark } = useAppTheme();
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const params = useLocalSearchParams<{ listA?: string; listB?: string }>();
+  const params = useLocalSearchParams<{ aId?: string; bId?: string }>();
 
   const headerForegroundColor = isDark ? colors.textOnSurface : '#FFFFFF';
 
@@ -36,44 +29,27 @@ export function CompareListsScreen() {
   const colorA = colors.primary;
   const colorB = colors.success;
 
-  const { summaries, isLoading: summariesLoading, isAuthenticated } =
-    useSavedLists();
-  const {
-    listAId,
-    listBId,
-    comparison,
-    isLoading,
-    error,
-    canCompare,
-    setListA,
-    setListB,
-    swap,
-    compare,
-    reset,
-    clearError,
-  } = useCompareLists();
+  const aId = params.aId ?? null;
+  const bId = params.bId ?? null;
 
-  // Pre-seleccionar listas vía query params (?listA=...&listB=...)
-  useEffect(() => {
-    if (params.listA && !listAId) setListA(params.listA);
-    if (params.listB && !listBId) setListB(params.listB);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const hasValidParams = !!aId && !!bId && aId !== bId;
 
-  // Lanzar comparación automáticamente al tener ambas seleccionadas.
+  // Sin params válidos: volver al listado. La selección vive en SavedListsScreen.
   useEffect(() => {
-    if (canCompare && !comparison && !isLoading) {
-      void compare();
-    }
-  }, [canCompare, comparison, isLoading, compare]);
+    if (hasValidParams) return;
+    if (router.canGoBack()) router.back();
+    else router.replace('/(tabs)/shopping');
+  }, [hasValidParams, router]);
+
+  const { comparison, isLoading, error, clearError, retry } = useCompareLists(
+    hasValidParams ? aId : null,
+    hasValidParams ? bId : null,
+  );
 
   const handleBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/(tabs)/shopping');
   };
-
-  const disabledForA = useMemo(() => (listBId ? [listBId] : []), [listBId]);
-  const disabledForB = useMemo(() => (listAId ? [listAId] : []), [listAId]);
 
   return (
     <View
@@ -97,16 +73,9 @@ export function CompareListsScreen() {
             Comparar listas
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Elige dos listas para ver dónde te conviene comprar
+            Diferencias de precio entre dos recibos
           </Text>
         </View>
-        {comparison ? (
-          <AppPressable onPress={reset} style={styles.resetButton}>
-            <Text style={[styles.resetText, { color: colors.primary }]}>
-              Reiniciar
-            </Text>
-          </AppPressable>
-        ) : null}
       </View>
 
       <ScrollView
@@ -117,106 +86,37 @@ export function CompareListsScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Selectores */}
-        <View style={styles.pickersRow}>
-          <CompareListPicker
-            label='Lista A'
-            accentColor={colorA}
-            selectedId={listAId}
-            summaries={summaries}
-            disabledIds={disabledForA}
-            onSelect={setListA}
-          />
-          <AppPressable
-            onPress={swap}
-            disabled={!listAId && !listBId}
-            style={[
-              styles.swapButton,
-              {
-                backgroundColor: colors.backgroundSecondary,
-                opacity: !listAId && !listBId ? 0.4 : 1,
-              },
-            ]}
-          >
-            <ArrowLeftRight
-              size={18}
-              color={colors.textSecondary}
-              strokeWidth={2}
-            />
-          </AppPressable>
-          <CompareListPicker
-            label='Lista B'
-            accentColor={colorB}
-            selectedId={listBId}
-            summaries={summaries}
-            disabledIds={disabledForB}
-            onSelect={setListB}
-          />
-        </View>
-
-        {/* Botón Compare */}
-        {!comparison ? (
-          <AppButton
-            title={isLoading ? 'Comparando...' : 'Comparar'}
-            onPress={() => void compare()}
-            loading={isLoading}
-            disabled={!canCompare}
-          />
-        ) : null}
-
-        {/* Estados informativos */}
-        {!isAuthenticated ? (
-          <View
-            style={[
-              styles.notice,
-              { backgroundColor: colors.backgroundSecondary },
-            ]}
-          >
-            <Text style={[styles.noticeText, { color: colors.textSecondary }]}>
-              Inicia sesión para sincronizar listas y poder compararlas.
-            </Text>
-          </View>
-        ) : null}
-
-        {isAuthenticated && summariesLoading && summaries.length === 0 ? (
+        {/* Loading inicial */}
+        {isLoading && !comparison ? (
           <View style={styles.centeredBlock}>
-            <ActivityIndicator size='small' color={colors.primary} />
+            <ActivityIndicator size='large' color={colors.primary} />
             <Text style={[styles.centeredText, { color: colors.textSecondary }]}>
-              Cargando listas disponibles...
+              Calculando comparación...
             </Text>
           </View>
         ) : null}
 
-        {isAuthenticated &&
-        !summariesLoading &&
-        summaries.length < 2 &&
-        !comparison ? (
-          <View
-            style={[
-              styles.notice,
-              { backgroundColor: colors.warningLight },
-            ]}
-          >
-            <Text style={[styles.noticeText, { color: colors.warning }]}>
-              Necesitas al menos dos listas guardadas para comparar.
-            </Text>
-          </View>
-        ) : null}
-
-        {/* Error */}
+        {/* Error con retry */}
         {error ? (
-          <AppPressable
-            onPress={clearError}
-            style={[
-              styles.errorBanner,
-              { backgroundColor: colors.dangerLight },
-            ]}
-          >
-            <XCircle size={18} color={colors.danger} />
-            <Text style={[styles.errorText, { color: colors.danger }]}>
-              {error}
-            </Text>
-          </AppPressable>
+          <View style={styles.errorSection}>
+            <AppPressable
+              onPress={clearError}
+              style={[
+                styles.errorBanner,
+                { backgroundColor: colors.dangerLight },
+              ]}
+            >
+              <XCircle size={18} color={colors.danger} />
+              <Text style={[styles.errorText, { color: colors.danger }]}>
+                {error}
+              </Text>
+            </AppPressable>
+            <AppButton
+              title='Reintentar'
+              onPress={() => void retry()}
+              loading={isLoading}
+            />
+          </View>
         ) : null}
 
         {/* Resultado */}
@@ -302,8 +202,8 @@ export function CompareListsScreen() {
           </>
         ) : null}
 
-        {/* Estado vacío inicial */}
-        {!comparison && !isLoading && (!listAId || !listBId) ? (
+        {/* Sin resultado y sin error y sin loading → params inválidos (mientras redirige) */}
+        {!isLoading && !comparison && !error && !hasValidParams ? (
           <View style={styles.emptyState}>
             <View
               style={[
@@ -320,11 +220,11 @@ export function CompareListsScreen() {
             <Text
               style={[styles.emptyTitle, { color: colors.textOnSurface }]}
             >
-              Selecciona dos listas
+              Selecciona dos listas primero
             </Text>
             <Text style={[styles.emptyMessage, { color: colors.textSecondary }]}>
-              Comparamos productos por nombre y te decimos en cuál lista te
-              conviene comprar.
+              Mantén presionada una compra en la pestaña Recibos para
+              seleccionarla, escoge otra y pulsa Comparar.
             </Text>
           </View>
         ) : null}
@@ -405,14 +305,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  resetButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  resetText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
   scroll: {
     flex: 1,
   },
@@ -420,37 +312,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     gap: 16,
   },
-  pickersRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  swapButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  notice: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  noticeText: {
-    fontSize: 13,
-    fontWeight: '500',
-    lineHeight: 18,
-  },
   centeredBlock: {
-    paddingVertical: 24,
+    paddingVertical: 60,
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   centeredText: {
     fontSize: 13,
     fontWeight: '500',
+  },
+  errorSection: {
+    gap: 12,
   },
   errorBanner: {
     flexDirection: 'row',

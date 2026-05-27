@@ -13,6 +13,7 @@ import type {
   ShoppingListSummary,
 } from '../../domain/entities/shopping-list-summary.entity';
 import type {
+  BackendShoppingListType,
   CreateShoppingItemInput,
   CreateShoppingListInput,
   ShoppingItem,
@@ -42,7 +43,7 @@ interface ShoppingListDto {
   userId: string | null;
   name: string;
   storeName: string | null;
-  listType: ShoppingListType;
+  listType: BackendShoppingListType;
   countryCode: string;
   currencyCode: string;
   exchangeRateSnapshot: number | null;
@@ -67,7 +68,7 @@ interface SummaryDto {
   id: string;
   name: string;
   storeName: string | null;
-  listType: ShoppingListType;
+  listType: BackendShoppingListType;
   currencyCode: string;
   isActive: boolean;
   scheduledDate: string | null;
@@ -133,6 +134,33 @@ function isLocalId(id: string | undefined): boolean {
   return !!id && id.startsWith('local-');
 }
 
+/**
+ * Deriva el tipo lógico del frontend a partir de la combinación backend.
+ * `RECEIPT` con `isActive=false` se mapea a `COMPLETED`.
+ */
+function deriveListType(
+  backendType: BackendShoppingListType,
+  isActive: boolean,
+): ShoppingListType {
+  if (backendType === 'RECEIPT' && !isActive) return 'COMPLETED';
+  return backendType;
+}
+
+/**
+ * Convierte un `listType` del dominio en el par `{listType, isActive}` que
+ * acepta el backend. `COMPLETED` produce `{listType: 'RECEIPT', isActive: false}`.
+ * Devuelve `undefined` en `isActive` cuando el caller debe controlarlo.
+ */
+function serializeListType(type: ShoppingListType): {
+  listType: BackendShoppingListType;
+  isActive?: boolean;
+} {
+  if (type === 'COMPLETED') {
+    return { listType: 'RECEIPT', isActive: false };
+  }
+  return { listType: type };
+}
+
 function defaultCountryMeta(): { countryCode: string; currencyCode: string } {
   const country = useCountryStore.getState().country;
   return {
@@ -168,7 +196,7 @@ function mapListDtoToEntity(dto: ShoppingListDto): ShoppingList {
     name: dto.name,
     storeName: dto.storeName,
     status: dto.isActive ? 'active' : 'completed',
-    listType: dto.listType,
+    listType: deriveListType(dto.listType, dto.isActive),
     countryCode: dto.countryCode,
     currencyCode: dto.currencyCode,
     ivaEnabled: dto.ivaEnabled,
@@ -193,7 +221,7 @@ function mapSummaryDtoToEntity(dto: SummaryDto): ShoppingListSummary {
     id: dto.id,
     name: dto.name,
     storeName: dto.storeName,
-    listType: dto.listType,
+    listType: deriveListType(dto.listType, dto.isActive),
     currencyCode: dto.currencyCode,
     isActive: dto.isActive,
     scheduledDate: dto.scheduledDate,
@@ -269,10 +297,12 @@ function mapItemInputToDto(input: CreateShoppingItemInput) {
 
 function buildCreateBody(input: CreateShoppingListInput) {
   const meta = defaultCountryMeta();
+  // POST no acepta `isActive` per spec — si llega COMPLETED degradamos a RECEIPT.
+  const serialized = serializeListType(input.listType ?? 'TEMPLATE');
   return {
     name: input.name,
     storeName: input.storeName ?? null,
-    listType: input.listType ?? 'TEMPLATE',
+    listType: serialized.listType,
     countryCode: input.countryCode ?? meta.countryCode,
     currencyCode: input.currencyCode ?? meta.currencyCode,
     exchangeRateSnapshot: input.exchangeRateSnapshot ?? 0,
@@ -288,7 +318,15 @@ function buildPatchBody(data: UpdateShoppingListInput) {
   const body: Record<string, unknown> = {};
   if (data.name !== undefined) body.name = data.name;
   if (data.storeName !== undefined) body.storeName = data.storeName;
-  if (data.listType !== undefined) body.listType = data.listType;
+  if (data.listType !== undefined) {
+    const serialized = serializeListType(data.listType);
+    body.listType = serialized.listType;
+    // COMPLETED requiere apagar isActive en el backend (a menos que el caller ya
+    // haya fijado uno explícitamente — el caller manda en ese caso).
+    if (serialized.isActive !== undefined && data.isActive === undefined) {
+      body.isActive = serialized.isActive;
+    }
+  }
   if (data.currencyCode !== undefined) body.currencyCode = data.currencyCode;
   if (data.exchangeRateSnapshot !== undefined)
     body.exchangeRateSnapshot = data.exchangeRateSnapshot;
@@ -311,6 +349,17 @@ function buildSearchBody(input: ShoppingListSearchInput) {
     for (const [key, value] of Object.entries(input.filters)) {
       if (value !== undefined) cleaned[key] = value;
     }
+
+    // Mapeo del enum lógico al backend:
+    // COMPLETED → {listType: RECEIPT, isActive: false} (override siempre).
+    // RECEIPT   → si caller no fijó isActive, default a true (compras activas).
+    if (cleaned.listType === 'COMPLETED') {
+      cleaned.listType = 'RECEIPT';
+      cleaned.isActive = false;
+    } else if (cleaned.listType === 'RECEIPT' && cleaned.isActive === undefined) {
+      cleaned.isActive = true;
+    }
+
     if (Object.keys(cleaned).length > 0) body.filters = cleaned;
   }
   return body;

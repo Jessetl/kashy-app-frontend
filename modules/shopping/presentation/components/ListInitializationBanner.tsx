@@ -30,13 +30,13 @@ export const ListInitializationBanner = React.memo(
         {isInitializing ? (
           <View style={styles.row}>
             <ActivityIndicator color={colors.primary} size='small' />
-            <Text style={[styles.text, { color: colors.text }]}>
+            <Text style={[styles.text, { color: colors.textOnSurface }]}>
               Inicializando lista...
             </Text>
           </View>
         ) : (
           <View style={styles.row}>
-            <Text style={[styles.text, { color: colors.text }]}> 
+            <Text style={[styles.text, { color: colors.textOnSurface }]}>
               {errorMessage ?? 'No hay lista activa.'}
             </Text>
             <AppPressable

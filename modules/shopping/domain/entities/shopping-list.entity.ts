@@ -1,8 +1,16 @@
 /** Estado lógico de la lista — derivado de `isActive` del backend. */
 export type ShoppingListStatus = 'active' | 'completed';
 
-/** Tipo de lista per spec. Para nuevas listas el frontend usa `TEMPLATE` por defecto. */
-export type ShoppingListType = 'TEMPLATE' | 'RECEIPT';
+/**
+ * Tipo de lista en dominio frontend. El backend solo conoce `TEMPLATE` y `RECEIPT`:
+ * `COMPLETED` es un estado lógico del frontend que se mapea en infra a
+ * `{listType: 'RECEIPT', isActive: false}` al persistir, y se restituye al
+ * deserializar respuestas con esa misma combinación.
+ */
+export type ShoppingListType = 'TEMPLATE' | 'RECEIPT' | 'COMPLETED';
+
+/** Subset de tipos que el backend acepta literalmente en payloads. */
+export type BackendShoppingListType = 'TEMPLATE' | 'RECEIPT';
 
 /** Producto dentro de una lista de compras */
 export interface ShoppingItem {

@@ -8,7 +8,14 @@ type UseShoppingListsHeaderVmParams = {
   handleDeleteList: () => void;
   handleBack: () => void;
   handleConvertToReceipt?: () => void;
+  /** Flow 10 — solo visible si RECEIPT con 100% items checked. */
+  handleCompleteList?: () => void;
   isTemplate: boolean;
+  isReceipt?: boolean;
+  isCompleted?: boolean;
+  canComplete?: boolean;
+  isLocal?: boolean;
+  isDraft?: boolean;
   purchasedCount: number;
   totalItems: number;
   activeListName: string;
@@ -29,7 +36,13 @@ export function useShoppingListsHeaderVm({
   handleDeleteList,
   handleBack,
   handleConvertToReceipt,
+  handleCompleteList,
   isTemplate,
+  isReceipt = false,
+  isCompleted = false,
+  canComplete = false,
+  isLocal = false,
+  isDraft = false,
   purchasedCount,
   totalItems,
   activeListName,
@@ -52,10 +65,18 @@ export function useShoppingListsHeaderVm({
     () => ({
       onBack: handleBack,
       onShare: canInteractWithList && canShare ? onShare : undefined,
-      onSave: canInteractWithList ? handleSave : undefined,
+      // Bookmark solo en draft (TEMPLATE no guardado). En COMPLETED se oculta.
+      onSave: canInteractWithList && !isCompleted ? handleSave : undefined,
       onConvertToReceipt:
-        canInteractWithList && isTemplate ? handleConvertToReceipt : undefined,
-      onDelete: canInteractWithList ? handleDeleteList : undefined,
+        canInteractWithList && isTemplate && !isDraft && !isCompleted
+          ? handleConvertToReceipt
+          : undefined,
+      onComplete:
+        canInteractWithList && isReceipt && canComplete && handleCompleteList
+          ? handleCompleteList
+          : undefined,
+      onDelete:
+        canInteractWithList && !isCompleted ? handleDeleteList : undefined,
     }),
     [
       canInteractWithList,
@@ -65,7 +86,12 @@ export function useShoppingListsHeaderVm({
       handleDeleteList,
       handleBack,
       handleConvertToReceipt,
+      handleCompleteList,
       isTemplate,
+      isReceipt,
+      isCompleted,
+      canComplete,
+      isDraft,
     ],
   );
 
@@ -75,6 +101,7 @@ export function useShoppingListsHeaderVm({
       totalItems,
       listName: activeListName,
       isTemplate,
+      isLocal,
       ivaEnabled,
       priceInLocal,
       onToggleIva: canInteractWithList ? handleToggleIva : disabledNoop,
@@ -90,6 +117,7 @@ export function useShoppingListsHeaderVm({
       totalItems,
       activeListName,
       isTemplate,
+      isLocal,
       ivaEnabled,
       priceInLocal,
       canInteractWithList,

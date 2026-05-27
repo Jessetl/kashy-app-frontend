@@ -23,13 +23,12 @@ type UpdateItemInput = {
 type UseShoppingListsScreenHandlersParams = {
   activeList: ShoppingList | null;
   isInitializingList: boolean;
-  isAuthenticated: boolean;
-  openLoginModal: (onSuccess?: () => void) => void;
   editingItem: ShoppingItem | null;
   category: ProductCategory;
   setEditingItem: React.Dispatch<React.SetStateAction<ShoppingItem | null>>;
   setPriceInLocal: React.Dispatch<React.SetStateAction<boolean>>;
   setShowSaveModal: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowConvertAlert: React.Dispatch<React.SetStateAction<boolean>>;
   addItem: (input: AddItemInput) => Promise<void> | void;
   updateItem: (id: string, input: UpdateItemInput) => Promise<void> | void;
   removeItem: (id: string) => Promise<void> | void;
@@ -38,31 +37,30 @@ type UseShoppingListsScreenHandlersParams = {
   updateListSettings: (
     settings: Partial<Pick<ShoppingList, 'ivaEnabled' | 'listType'>>,
   ) => Promise<void> | void;
-  saveList: (name: string, storeName: string) => Promise<void> | void;
   deleteList: (id: string) => Promise<void> | void;
   createList: (name: string) => Promise<void> | void;
+  commitDraft: (input: { name: string; storeName?: string }) => Promise<void> | void;
   navigateAfterDelete: () => void;
 };
 
 export function useShoppingListsScreenHandlers({
   activeList,
   isInitializingList,
-  isAuthenticated,
-  openLoginModal,
   editingItem,
   category,
   setEditingItem,
   setPriceInLocal,
   setShowSaveModal,
+  setShowConvertAlert,
   addItem,
   updateItem,
   removeItem,
   toggleItemPurchased,
   updateItemQuantity,
   updateListSettings,
-  saveList,
   deleteList,
   createList,
+  commitDraft,
   navigateAfterDelete,
 }: UseShoppingListsScreenHandlersParams) {
   const handleCancelEdit = useCallback(() => {
@@ -141,25 +139,16 @@ export function useShoppingListsScreenHandlers({
     if (!activeList || isInitializingList) {
       return;
     }
-    if (!isAuthenticated) {
-      openLoginModal(() => setShowSaveModal(true));
-      return;
-    }
+    // Guest también puede guardar localmente; no forzar login.
     setShowSaveModal(true);
-  }, [
-    activeList,
-    isInitializingList,
-    isAuthenticated,
-    openLoginModal,
-    setShowSaveModal,
-  ]);
+  }, [activeList, isInitializingList, setShowSaveModal]);
 
   const handleSaveList = useCallback(
     (name: string, storeName: string) => {
-      void saveList(name, storeName);
+      void commitDraft({ name, storeName });
       setShowSaveModal(false);
     },
-    [saveList, setShowSaveModal],
+    [commitDraft, setShowSaveModal],
   );
 
   const handleConvertToReceipt = useCallback(() => {
@@ -169,19 +158,8 @@ export function useShoppingListsScreenHandlers({
     if (activeList.listType === 'RECEIPT') {
       return;
     }
-
-    Alert.alert(
-      'Hacer compra',
-      'Esto convertira la plantilla en un recibo donde podras registrar los precios. La plantilla original sera reemplazada.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Continuar',
-          onPress: () => void updateListSettings({ listType: 'RECEIPT' }),
-        },
-      ],
-    );
-  }, [activeList, isInitializingList, updateListSettings]);
+    setShowConvertAlert(true);
+  }, [activeList, isInitializingList, setShowConvertAlert]);
 
   const handleDeleteList = useCallback(() => {
     if (!activeList || isInitializingList) {

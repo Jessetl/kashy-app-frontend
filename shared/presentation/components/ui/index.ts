@@ -1,3 +1,9 @@
+export { AlertDialog } from './alert-dialog';
+export type {
+  AlertAction,
+  AlertActionVariant,
+  AlertTone,
+} from './alert-dialog';
 export { AppButton } from './app-button';
 export { AppCalendarInput } from './app-calendar-input';
 export { AppPressable } from './app-pressable';
