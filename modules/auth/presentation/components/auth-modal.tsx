@@ -3,9 +3,10 @@ import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 
 import { LoginForm } from './login-form';
+import { RecoverPasswordForm } from './recover-password-form';
 import { RegisterForm } from './register-form';
 
-type AuthView = 'login' | 'register';
+type AuthView = 'login' | 'register' | 'recover';
 
 interface AuthModalProps {
   visible: boolean;
@@ -38,7 +39,41 @@ export const AuthModal = React.memo(function AuthModal({
     setActiveView('login');
   }, []);
 
+  const switchToRecover = useCallback(() => {
+    resetFormRef.current?.();
+    setActiveView('recover');
+  }, []);
+
   const isRegister = activeView === 'register';
+
+  const renderView = () => {
+    switch (activeView) {
+      case 'register':
+        return (
+          <RegisterForm
+            onSwitchToLogin={switchToLogin}
+            onResetRef={handleResetRef}
+            onSuccess={onClose}
+          />
+        );
+      case 'recover':
+        return (
+          <RecoverPasswordForm
+            onSwitchToLogin={switchToLogin}
+            onResetRef={handleResetRef}
+          />
+        );
+      default:
+        return (
+          <LoginForm
+            onSuccess={onClose}
+            onSwitchToRegister={switchToRegister}
+            onForgotPassword={switchToRecover}
+            onResetRef={handleResetRef}
+          />
+        );
+    }
+  };
 
   return (
     <BottomSheetModal
@@ -54,19 +89,7 @@ export const AuthModal = React.memo(function AuthModal({
         keyboardShouldPersistTaps='handled'
         bounces={false}
       >
-        {isRegister ? (
-          <RegisterForm
-            onSwitchToLogin={switchToLogin}
-            onResetRef={handleResetRef}
-            onSuccess={onClose}
-          />
-        ) : (
-          <LoginForm
-            onSuccess={onClose}
-            onSwitchToRegister={switchToRegister}
-            onResetRef={handleResetRef}
-          />
-        )}
+        {renderView()}
       </ScrollView>
     </BottomSheetModal>
   );
