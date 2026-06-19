@@ -1,5 +1,8 @@
-import { ApiHttpError, apiClient } from '@/shared/infrastructure/api';
-import { getAccessToken } from '@/shared/infrastructure/auth/auth.store';
+import {
+  ApiHttpError,
+  apiClient,
+  refreshTokenOnce,
+} from '@/shared/infrastructure/api';
 
 import type {
   AuthSession,
@@ -16,24 +19,21 @@ import type { AuthPort } from '../domain/auth.port';
 
 interface LoginResponsePayload {
   accessToken?: string;
+  refreshToken?: string;
   expiresIn?: number;
   user?: AuthUser;
 }
 
-interface RefreshResponsePayload {
-  accessToken?: string;
-  expiresIn?: number;
-}
-
-function toAuthTokens(payload: RefreshResponsePayload): AuthTokens {
+function toAuthTokens(payload: LoginResponsePayload): AuthTokens {
   const accessToken = payload.accessToken;
+  const refreshToken = payload.refreshToken;
   const expiresIn = payload.expiresIn ?? 900;
 
-  if (!accessToken) {
-    throw new Error('Respuesta de autenticación inválida: falta accessToken');
+  if (!accessToken || !refreshToken) {
+    throw new Error('Respuesta de autenticación inválida: faltan tokens');
   }
 
-  return { accessToken, expiresIn };
+  return { accessToken, refreshToken, expiresIn };
 }
 
 function toAuthSession(payload: LoginResponsePayload): AuthSession {
@@ -89,24 +89,18 @@ export class AuthDatasource implements AuthPort {
   }
 
   async refreshToken(): Promise<AuthTokens> {
-    const expiredToken = getAccessToken();
+    // Reusa el refresh único compartido con el interceptor 401 (mismo mutex,
+    // misma escritura en SecureStore). Devuelve null si falla → 401 al caller.
+    const tokens = await refreshTokenOnce();
 
-    if (!expiredToken) {
+    if (!tokens) {
       throw new ApiHttpError({
-        message: 'No hay sesión activa para renovar',
+        message: 'No se pudo renovar la sesión',
         status: 401,
       });
     }
 
-    // `skipAuth: true` evita que el interceptor entre en bucle si el refresh
-    // mismo devuelve 401; en su lugar lo dejamos propagar al caller.
-    const response = await apiClient<RefreshResponsePayload>('/auth/refresh', {
-      method: 'POST',
-      skipAuth: true,
-      headers: { Authorization: `Bearer ${expiredToken}` },
-    });
-
-    return toAuthTokens(response.data);
+    return tokens;
   }
 
   async getProfile(): Promise<AuthUser> {

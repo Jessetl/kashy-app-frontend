@@ -95,8 +95,8 @@ export function useGoogleAuth({
 
     void googleAuthUseCase
       .execute({ googleIdToken })
-      .then((session) => {
-        setSession(session);
+      .then(async (session) => {
+        await setSession(session);
         onSuccess?.();
       })
       .catch((err: unknown) => {

@@ -1,4 +1,4 @@
-export { apiClient } from './api-client';
+export { apiClient, refreshTokenOnce } from './api-client';
 export { ApiHttpError } from './api-http-error';
 export type {
   ApiEnvelope,

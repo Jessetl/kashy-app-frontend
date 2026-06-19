@@ -23,7 +23,7 @@ function getLoginErrorMessage(err: unknown): string {
   return err instanceof Error ? err.message : 'Error al iniciar sesión';
 }
 
-export function useLogin(onSuccess?: () => void): UseLoginReturn {
+export const useLogin = (onSuccess?: () => void): UseLoginReturn => {
   const setSession = useAuthStore((s) => s.setSession);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +38,7 @@ export function useLogin(onSuccess?: () => void): UseLoginReturn {
 
       try {
         const session = await loginUseCase.execute(credentials);
-        setSession(session);
+        await setSession(session);
         onSuccess?.();
       } catch (err) {
         const message = getLoginErrorMessage(err);
@@ -56,4 +56,4 @@ export function useLogin(onSuccess?: () => void): UseLoginReturn {
     submitLogin,
     clearError,
   };
-}
+};
