@@ -14,7 +14,7 @@
 | Dato            | Dónde guardar                                                                           | Notas                                                                                                                               |
 | --------------- | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `refreshToken`  | **Keychain** (iOS) / **Android Keystore + SharedPreferences cifrado AES-GCM** (Android) | Usar **`expo-secure-store`** (módulo oficial Expo, ya instalado). Wrapper `secureStorage`. Persiste entre reinicios. Es el crítico. |
-| `accessToken`   | **Keychain** (iOS) / **Keystore** (Android) — misma lib (`expo-secure-store`)           | Persiste entre sesiones. Al abrir la app, si expiró (15 min), se dispara refresh automático.                                        |
+| `accessToken`   | **Keychain** (iOS) / **Keystore** (Android) — misma lib (`expo-secure-store`)           | Persiste entre sesiones. Al abrir la app, si expiró (~1h), se dispara refresh automático.                                        |
 | `user`          | **Zustand** (memoria) + puede cachearse en Keychain/Keystore para arranque rápido       | Se rehidrata al iniciar la app desde almacenamiento seguro o desde `GET /auth/profile`.                                             |
 | Preferencias UI | **AsyncStorage** — onboarding completado, tema, idioma, etc.                            | Datos no sensibles solamente.                                                                                                       |
 
@@ -105,17 +105,19 @@
 ```json
 {
   "email": "string",
-  "password": "string"
+  "password": "string (sin validación de longitud)"
 }
 ```
+
+> El login **no** valida longitud de contraseña — la verificación la hace Firebase contra el hash existente. Reglas de longitud solo aplican en `register`/`change-password`.
 
 **Esperar `200`:**
 
 ```json
 {
-  "accessToken": "string (JWT custom, 15 min)",
+  "accessToken": "string (JWT custom, TTL = expiresIn del idToken de Firebase, ~3600s)",
   "refreshToken": "string (Firebase refresh, larga vida)",
-  "expiresIn": 900,
+  "expiresIn": 3600,
   "user": {
     "id": "uuid",
     "email": "string",
@@ -164,9 +166,9 @@
 
 ```json
 {
-  "accessToken": "string (JWT custom, 15 min)",
+  "accessToken": "string (JWT custom, TTL = expiresIn del idToken de Firebase, ~3600s)",
   "refreshToken": "string (Firebase refresh, larga vida)",
-  "expiresIn": 900,
+  "expiresIn": 3600,
   "user": {
     "id": "uuid",
     "email": "string",
@@ -217,9 +219,9 @@
 
 ```json
 {
-  "accessToken": "string (nuevo JWT custom, 15 min)",
+  "accessToken": "string (nuevo JWT custom, TTL = expiresIn del idToken de Firebase, ~3600s)",
   "refreshToken": "string (rotado si Firebase entregó uno nuevo, sino el mismo)",
-  "expiresIn": 900
+  "expiresIn": 3600
 }
 ```
 

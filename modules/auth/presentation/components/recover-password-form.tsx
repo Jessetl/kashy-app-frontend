@@ -1,9 +1,7 @@
 import {
   AppButton,
   AppTextInput,
-  DividerWithText,
   ErrorBanner,
-  SocialButton,
 } from '@/shared/presentation/components/ui';
 import { AppPressable } from '@/shared/presentation/components/ui/app-pressable';
 import { useThemeColors } from '@/shared/presentation/hooks/use-app-theme';
@@ -11,55 +9,40 @@ import React from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { useGoogleAuth } from '../hooks/use-google-auth';
-import { useLogin } from '../hooks/use-login';
+import { useRecoverPassword } from '../hooks/use-recover-password';
 
-interface LoginFormValues {
+interface RecoverFormValues {
   email: string;
-  password: string;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-interface LoginFormProps {
-  onSuccess: () => void;
-  onSwitchToRegister: () => void;
-  onForgotPassword: () => void;
+interface RecoverPasswordFormProps {
+  onSwitchToLogin: () => void;
   onResetRef: (reset: () => void) => void;
 }
 
-export const LoginForm = React.memo(function LoginForm({
-  onSuccess,
-  onSwitchToRegister,
-  onForgotPassword,
+export const RecoverPasswordForm = React.memo(function RecoverPasswordForm({
+  onSwitchToLogin,
   onResetRef,
-}: LoginFormProps) {
+}: RecoverPasswordFormProps) {
   const colors = useThemeColors();
   const {
     control,
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<LoginFormValues>({
-    defaultValues: {
-      email: '',
-      password: '',
-    },
+  } = useForm<RecoverFormValues>({
+    defaultValues: { email: '' },
     mode: 'onBlur',
     reValidateMode: 'onChange',
   });
 
-  const { isLoading, error, submitLogin, clearError } = useLogin(onSuccess);
-
-  const {
-    promptAsync: googlePrompt,
-    isLoading: googleLoading,
-    error: googleError,
-    clearError: clearGoogleError,
-  } = useGoogleAuth({ onSuccess });
+  const { isLoading, error, successMessage, submitRecover, clearError, clearSuccess } =
+    useRecoverPassword();
 
   const handleFormSubmit = handleSubmit(async (values) => {
-    await submitLogin(values);
+    await submitRecover(values.email);
   });
 
   // Exponer reset al padre
@@ -67,23 +50,33 @@ export const LoginForm = React.memo(function LoginForm({
     onResetRef(() => {
       reset();
       clearError();
-      clearGoogleError();
+      clearSuccess();
     });
-  }, [clearError, clearGoogleError, onResetRef, reset]);
+  }, [clearError, clearSuccess, onResetRef, reset]);
 
   return (
     <>
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.title, { color: colors.textOnSurface }]}>
-          Iniciar Sesión
+          Recuperar Contraseña
         </Text>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Ingresa tus credenciales para continuar
+          Ingresa tu email y te enviaremos un enlace para restablecerla
         </Text>
       </View>
 
       <ErrorBanner message={error} />
+
+      {successMessage && (
+        <View
+          style={[styles.successBanner, { backgroundColor: colors.successLight }]}
+        >
+          <Text style={[styles.successText, { color: colors.success }]}>
+            {successMessage}
+          </Text>
+        </View>
+      )}
 
       {/* Form */}
       <View style={styles.form}>
@@ -122,44 +115,8 @@ export const LoginForm = React.memo(function LoginForm({
           )}
         />
 
-        <Controller
-          control={control}
-          name='password'
-          rules={{ required: 'La contraseña es requerida' }}
-          render={({ field: { onChange, onBlur, value } }) => (
-            <View style={styles.fieldWrapper}>
-              <AppTextInput
-                label='Contraseña'
-                placeholder='••••••••'
-                value={value}
-                onBlur={onBlur}
-                onChangeText={(text) => {
-                  clearError();
-                  onChange(text);
-                }}
-                secureTextEntry
-                editable={!isLoading}
-                hasError={!!errors.password}
-              />
-              {errors.password && (
-                <Text style={[styles.fieldError, { color: colors.danger }]}>
-                  {errors.password.message}
-                </Text>
-              )}
-            </View>
-          )}
-        />
-
-        <View style={styles.forgotRow}>
-          <AppPressable onPress={onForgotPassword}>
-            <Text style={[styles.forgotLink, { color: colors.primary }]}>
-              ¿Olvidaste tu contraseña?
-            </Text>
-          </AppPressable>
-        </View>
-
         <AppButton
-          title='Iniciar Sesión'
+          title='Enviar enlace'
           onPress={() => {
             void handleFormSubmit();
           }}
@@ -168,28 +125,14 @@ export const LoginForm = React.memo(function LoginForm({
         />
       </View>
 
-      <DividerWithText text='o continúa con' />
-
-      <ErrorBanner message={googleError} />
-
-      {/* Social Login */}
-      <View style={styles.socialRow}>
-        <SocialButton
-          provider='Google'
-          icon='G'
-          onPress={googlePrompt}
-          loading={googleLoading}
-        />
-      </View>
-
-      {/* Switch to Register */}
+      {/* Switch to Login */}
       <View style={styles.switchRow}>
         <Text style={[styles.switchText, { color: colors.textSecondary }]}>
-          ¿No tienes cuenta?
+          ¿Ya la recordaste?
         </Text>
-        <AppPressable onPress={onSwitchToRegister}>
+        <AppPressable onPress={onSwitchToLogin}>
           <Text style={[styles.switchLink, { color: colors.primary }]}>
-            Regístrate
+            Iniciar sesión
           </Text>
         </AppPressable>
       </View>
@@ -213,6 +156,15 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 20,
   },
+  successBanner: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  successText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   form: {
     gap: 16,
   },
@@ -226,18 +178,6 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     marginTop: 4,
-  },
-  forgotRow: {
-    alignItems: 'flex-end',
-    marginTop: -4,
-  },
-  forgotLink: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  socialRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
   },
   switchRow: {
     flexDirection: 'row',
