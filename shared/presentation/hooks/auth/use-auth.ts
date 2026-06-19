@@ -1,5 +1,3 @@
-// Imports directos al composition / hooks de reset (no al barrel) para evitar
-// ciclos. El composition de auth no toca presentation, así que es seguro.
 import { logoutUseCase } from '@/modules/auth/composition';
 import { resetDebtsModule } from '@/modules/debts/presentation/hooks/use-reset-debts';
 import { resetShoppingListsModule } from '@/modules/shopping/presentation/hooks/useResetShoppingLists';
@@ -35,7 +33,7 @@ export function useAuth(): UseAuthReturn {
       // no-op intencional
     });
 
-    clearSession();
+    void clearSession();
     resetShoppingListsModule();
     resetDebtsModule();
   }, [clearSession]);

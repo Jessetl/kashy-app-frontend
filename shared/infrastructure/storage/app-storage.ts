@@ -1,7 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 
 const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
-  keychainService: 'valo-secure-storage',
+  keychainService: 'kashy-secure-storage',
+  keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
 };
 
 export const secureStorage = {

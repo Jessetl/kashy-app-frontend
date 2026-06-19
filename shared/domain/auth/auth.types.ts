@@ -1,7 +1,11 @@
 /** Tokens de autenticación devueltos por el backend.
- *  El refresh token vive solo en el servidor; el frontend solo guarda el accessToken. */
+ *  Ambos se guardan cifrados en Keychain/Keystore (SecureStore). El
+ *  `refreshToken` es el crítico: canjea por nuevos `accessToken` vía
+ *  `/auth/refresh`. Firebase puede rotarlo, por eso siempre se sobrescribe. */
 export interface AuthTokens {
   accessToken: string;
+  /** Refresh token de Firebase (larga vida, rotable). Es per-device. */
+  refreshToken: string;
   /** Segundos de vida del accessToken (ej. 900 = 15 min). */
   expiresIn: number;
 }

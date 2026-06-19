@@ -7,6 +7,9 @@ import { create } from 'zustand';
 import { secureStorage } from '../storage/app-storage';
 
 const AUTH_SESSION_KEY = 'auth-session';
+/** Key separada para el refresh token (el crítico). Nunca en el mismo blob
+ *  que se loguea/serializa por error. */
+const REFRESH_TOKEN_KEY = 'auth-refresh-token';
 
 type PersistedAuthSession = {
   isAuthenticated: boolean;
@@ -23,6 +26,9 @@ interface AuthState {
   user: AuthUser | null;
   /** Access token actual (JWT custom del backend, ~15 min de vida) */
   accessToken: string | null;
+  /** Refresh token de Firebase (larga vida). Copia en memoria; la fuente de
+   *  verdad persistente es SecureStore bajo `REFRESH_TOKEN_KEY`. */
+  refreshToken: string | null;
   /** Si la sesión se está restaurando al abrir la app */
   isRestoringSession: boolean;
   /** Si el modal de login está visible */
@@ -30,14 +36,15 @@ interface AuthState {
   /** Acción pendiente a ejecutar tras login exitoso */
   pendingAction: (() => void) | null;
 
-  /** Guarda la sesión completa tras login exitoso */
-  setSession: (session: AuthSession) => void;
-  /** Actualiza solo los tokens (tras refresh) */
-  updateTokens: (tokens: AuthTokens) => void;
+  /** Guarda la sesión completa tras login exitoso.
+   *  Escribe SecureStore (fuente de verdad) ANTES que Zustand. */
+  setSession: (session: AuthSession) => Promise<void>;
+  /** Actualiza solo los tokens (tras refresh). SecureStore antes que Zustand. */
+  updateTokens: (tokens: AuthTokens) => Promise<void>;
   /** Actualiza los datos del usuario en store y persistencia */
-  updateUser: (user: Partial<AuthUser>) => void;
-  /** Limpia toda la sesión (logout) */
-  clearSession: () => void;
+  updateUser: (user: Partial<AuthUser>) => Promise<void>;
+  /** Limpia toda la sesión (logout). Borra ambos tokens de SecureStore. */
+  clearSession: () => Promise<void>;
   /** Marca que la restauración terminó */
   setRestoringSession: (value: boolean) => void;
   /** Marca que la hidratación del store terminó */
@@ -55,11 +62,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isAuthenticated: false,
   user: null,
   accessToken: null,
+  refreshToken: null,
   isRestoringSession: true,
   isLoginModalVisible: false,
   pendingAction: null,
 
-  setSession: (session: AuthSession) => {
+  setSession: async (session: AuthSession) => {
     const persistedSession: PersistedAuthSession = {
       isAuthenticated: true,
       user: session.user,
@@ -68,27 +76,28 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     const { pendingAction } = get();
 
-    set({
-      ...persistedSession,
-      isLoginModalVisible: false,
-      pendingAction: null,
-    });
-
-    void secureStorage.setItem(
+    // SecureStore primero (fuente de verdad), Zustand después.
+    await secureStorage.setItem(
       AUTH_SESSION_KEY,
       JSON.stringify(persistedSession),
     );
+    await secureStorage.setItem(REFRESH_TOKEN_KEY, session.tokens.refreshToken);
+
+    set({
+      ...persistedSession,
+      refreshToken: session.tokens.refreshToken,
+      isLoginModalVisible: false,
+      pendingAction: null,
+    });
 
     if (pendingAction) {
       queueMicrotask(pendingAction);
     }
   },
 
-  updateUser: (updates: Partial<AuthUser>) => {
+  updateUser: async (updates: Partial<AuthUser>) => {
     const state = get();
     const updatedUser = state.user ? { ...state.user, ...updates } : null;
-
-    set({ user: updatedUser });
 
     const persistedSession: PersistedAuthSession = {
       isAuthenticated: state.isAuthenticated,
@@ -96,15 +105,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       accessToken: state.accessToken,
     };
 
-    void secureStorage.setItem(
+    await secureStorage.setItem(
       AUTH_SESSION_KEY,
       JSON.stringify(persistedSession),
     );
+
+    set({ user: updatedUser });
   },
 
-  updateTokens: (tokens: AuthTokens) => {
-    set({ accessToken: tokens.accessToken });
-
+  updateTokens: async (tokens: AuthTokens) => {
     const state = get();
     const persistedSession: PersistedAuthSession = {
       isAuthenticated: state.isAuthenticated,
@@ -112,20 +121,26 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       accessToken: tokens.accessToken,
     };
 
-    void secureStorage.setItem(
+    // Sobrescribir SIEMPRE ambos tokens (Firebase puede rotar el refresh).
+    await secureStorage.setItem(
       AUTH_SESSION_KEY,
       JSON.stringify(persistedSession),
     );
+    await secureStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+
+    set({ accessToken: tokens.accessToken, refreshToken: tokens.refreshToken });
   },
 
-  clearSession: () => {
+  clearSession: async () => {
+    await secureStorage.removeItem(AUTH_SESSION_KEY);
+    await secureStorage.removeItem(REFRESH_TOKEN_KEY);
+
     set({
       isAuthenticated: false,
       user: null,
       accessToken: null,
+      refreshToken: null,
     });
-
-    void secureStorage.removeItem(AUTH_SESSION_KEY);
   },
 
   setRestoringSession: (value: boolean) => set({ isRestoringSession: value }),
@@ -137,7 +152,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return;
     }
 
-    const raw = await secureStorage.getItem(AUTH_SESSION_KEY);
+    const [raw, refreshToken] = await Promise.all([
+      secureStorage.getItem(AUTH_SESSION_KEY),
+      secureStorage.getItem(REFRESH_TOKEN_KEY),
+    ]);
 
     if (!raw) {
       set({ hasHydrated: true });
@@ -151,10 +169,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         isAuthenticated: parsed.isAuthenticated,
         user: parsed.user,
         accessToken: parsed.accessToken,
+        refreshToken,
         hasHydrated: true,
       });
     } catch {
       await secureStorage.removeItem(AUTH_SESSION_KEY);
+      await secureStorage.removeItem(REFRESH_TOKEN_KEY);
       set({ hasHydrated: true });
     }
   },
@@ -172,12 +192,19 @@ export function getAccessToken(): string | null {
   return useAuthStore.getState().accessToken;
 }
 
-/** Actualiza tokens de forma síncrona (para el interceptor de refresh). */
-export function updateTokensSync(tokens: AuthTokens): void {
-  useAuthStore.getState().updateTokens(tokens);
+/** Obtiene el refresh token actual de forma síncrona (para el interceptor). */
+export function getRefreshToken(): string | null {
+  return useAuthStore.getState().refreshToken;
 }
 
-/** Limpia sesión de forma síncrona (para el interceptor cuando refresh falla). */
-export function clearSessionSync(): void {
-  useAuthStore.getState().clearSession();
+/** Actualiza tokens desde el interceptor de refresh.
+ *  Devuelve la promesa de escritura en SecureStore; el caller puede ignorarla
+ *  porque el reintento usa el accessToken devuelto directamente. */
+export function updateTokensSync(tokens: AuthTokens): Promise<void> {
+  return useAuthStore.getState().updateTokens(tokens);
+}
+
+/** Limpia sesión desde el interceptor cuando el refresh falla. */
+export function clearSessionSync(): Promise<void> {
+  return useAuthStore.getState().clearSession();
 }

@@ -1,8 +1,12 @@
+import Constants from 'expo-constants';
 import * as Crypto from 'expo-crypto';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 
 import { secureStorage } from '../storage/app-storage';
+
+// Versión declarada en app.json (estática al bundle time).
+const APP_VERSION = Constants.expoConfig?.version || '1.0.0';
 
 const DEVICE_ID_KEY = 'device-id';
 
@@ -64,7 +68,12 @@ export function getFcmToken(): string | null {
  *  Incluye `X-Fcm-Token` cuando el usuario aprobó notificaciones push. */
 export async function getDeviceHeaders(): Promise<Record<string, string>> {
   await initDeviceHeaders();
-  const headers: Record<string, string> = {};
+
+  const headers: Record<string, string> = {
+    'X-Platform': Platform.OS,
+    'X-App-Version': APP_VERSION,
+  };
+
   if (cachedDeviceId) {
     headers['X-Device-Id'] = cachedDeviceId;
   }

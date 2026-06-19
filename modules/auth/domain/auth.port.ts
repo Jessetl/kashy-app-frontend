@@ -15,8 +15,8 @@ export interface AuthPort {
   login(credentials: LoginCredentials): Promise<AuthSession>;
   register(credentials: RegisterCredentials): Promise<void>;
   googleAuth(credentials: GoogleAuthCredentials): Promise<AuthSession>;
-  /** Renueva el accessToken usando el JWT actual/expirado como
-   *  proof-of-possession (manejado por `apiClient`). */
+  /** Renueva los tokens canjeando el `refreshToken` guardado en SecureStore
+   *  vía `POST /auth/refresh` (refresh único compartido con el interceptor). */
   refreshToken(): Promise<AuthTokens>;
   /** Obtiene el perfil del usuario autenticado. */
   getProfile(): Promise<AuthUser>;

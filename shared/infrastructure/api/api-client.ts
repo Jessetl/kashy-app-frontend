@@ -12,6 +12,7 @@ import {
 import {
   clearSessionSync,
   getAccessToken,
+  getRefreshToken,
   updateTokensSync,
 } from '@/shared/infrastructure/auth/auth.store';
 import { getDeviceHeaders } from '@/shared/infrastructure/device/device';
@@ -25,22 +26,23 @@ let isRefreshing = false;
 let refreshPromise: Promise<AuthTokens | null> | null = null;
 
 async function attemptRefresh(): Promise<AuthTokens | null> {
-  const expiredToken = getAccessToken();
+  const refreshToken = getRefreshToken();
 
-  if (!expiredToken) {
+  if (!refreshToken) {
     return null;
   }
 
   try {
     const deviceHeaders = await getDeviceHeaders();
+
     const response = await fetch(`${API_URL}/auth/refresh`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${expiredToken}`,
         ...deviceHeaders,
       },
+      body: JSON.stringify({ refreshToken }),
     });
 
     if (!response.ok) {
@@ -54,15 +56,17 @@ async function attemptRefresh(): Promise<AuthTokens | null> {
       return null;
     }
 
-    updateTokensSync(tokens);
+    // Sobrescribe ambos tokens (Firebase puede haber rotado el refresh).
+    await updateTokensSync(tokens);
     return tokens;
   } catch {
     return null;
   }
 }
 
-/** Ejecuta refresh una sola vez aunque se llame varias veces en paralelo */
-function refreshTokenOnce(): Promise<AuthTokens | null> {
+/** Ejecuta refresh una sola vez aunque se llame varias veces en paralelo.
+ *  Único punto de refresh: lo comparten el interceptor 401 y el datasource. */
+export function refreshTokenOnce(): Promise<AuthTokens | null> {
   if (isRefreshing && refreshPromise) {
     return refreshPromise;
   }
