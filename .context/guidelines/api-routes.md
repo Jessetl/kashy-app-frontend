@@ -10,88 +10,109 @@
 
 ### Base URL
 
+Configurada por entorno (`shared/infrastructure/api/api-client.ts`):
+
 ```typescript
-const API_BASE_URL = 'https://api.kashy.app/api/v1';
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000';
 ```
+
+Las rutas se concatenan directo (`${API_URL}${path}`). El prefijo `/api/v1` vive en `EXPO_PUBLIC_API_URL` (ver `.env.example`), no en el código.
 
 ### Headers por Defecto
 
-Todas las peticiones (excepto las públicas) deben incluir estos headers:
+El `api-client` arma estos headers. **No** envía `X-Device-Id` ni `X-Device-Name`.
 
 ```typescript
-const getHeaders = (token?: string): Record<string, string> => ({
+const requestHeaders = {
   'Content-Type': 'application/json',
-  'X-Device-Id': deviceId, // UUID único, persistido en AsyncStorage
-  'X-Device-Name': deviceName, // Formato: [OS] [VERSION] [MARCA] [MODEL]
+  Accept: 'application/json',
+  // Authorization se adjunta automáticamente desde el store, salvo skipAuth
   ...(token && { Authorization: `Bearer ${token}` }),
-});
+};
 ```
 
-| Header          | Cómo obtenerlo                                                            | Ejemplo                         |
-| :-------------- | :------------------------------------------------------------------------ | :------------------------------ |
-| `X-Device-Id`   | Generar UUID al primer uso, guardar en AsyncStorage.                      | `a1b2c3d4-e5f6-...`             |
-| `X-Device-Name` | React Native Device Info: `${Platform.OS} ${osVersion} ${brand} ${model}` | `Android 14 Samsung Galaxy S24` |
-| `Authorization` | Token JWT recibido en login/register. Guardar en Zustand + AsyncStorage.  | `Bearer eyJhbG...`              |
+| Header          | Cómo se obtiene                                                                 |
+| :-------------- | :----------------------------------------------------------------------------- |
+| `Authorization` | `Bearer {accessToken}` — auto-adjuntado vía `getAccessToken()`. Omitido si `skipAuth: true`. |
 
 ---
 
-## Rutas Públicas
+## Rutas Públicas (`skipAuth`)
 
-No requieren `Authorization`, `X-Device-Id` ni `X-Device-Name`.
+No adjuntan `Authorization`.
 
-| Método   | Ruta                     | Descripción                                     |
-| :------- | :----------------------- | :---------------------------------------------- |
-| 🟢 `GET` | `/health`                | Health check. Útil para verificar conectividad. |
-| 🟢 `GET` | `/exchange-rate/current` | Tasa de cambio actual (BCV oficial).            |
+| Método   | Ruta                      | Descripción                          |
+| :------- | :------------------------ | :----------------------------------- |
+| 🟢 `GET` | `/exchange-rates/current` | Tasa de cambio actual (BCV oficial). |
+| 🟡 `POST`| `/users/login`            | Login.                               |
+| 🟡 `POST`| `/users/register`         | Registro.                            |
+| 🟡 `POST`| `/users/google-auth`      | Login/registro con Google.           |
+| 🟡 `POST`| `/users/refresh`          | Renovar tokens.                      |
 
 ---
 
-## Manejo de Token — Refresh Automático
+## Sesión — Almacenamiento de Tokens
 
-El frontend **nunca** maneja el refresh token de Firebase. El flujo es:
+El frontend **sí** maneja el `refreshToken`. Ambos tokens se guardan en dos lugares (`shared/infrastructure/auth/auth.store.ts`):
 
-1. Login/Register devuelve `access_token` (JWT custom, 15 min) + `expires_in`.
-2. Guardar `access_token` en Zustand (memoria) y AsyncStorage (persistencia).
-3. En cada request, enviar `Authorization: Bearer {access_token}`.
-4. Si el backend responde `401`:
-   - Llamar a `POST /auth/refresh` (solo envía `X-Device-Id`).
-   - Si responde `200`: guardar el nuevo `access_token` y reintentar el request original.
-   - Si responde `401`: el refresh token expiró o fue revocado → redirigir al login.
-5. **Nunca pedir al usuario que vuelva a loguearse si el refresh funciona.**
+1. **Memoria** — Zustand store (`accessToken`, `refreshToken`).
+2. **Persistencia** — **SecureStore** (`expo-secure-store`, encriptado, keychainService `valo-secure-storage`), bajo la key `auth-session`:
+
+```jsonc
+// secureStorage['auth-session']
+{
+  "isAuthenticated": true,
+  "user": { /* AuthUser */ },
+  "accessToken": "string", // = idToken del backend
+  "refreshToken": "string"
+}
+```
+
+> ⚠️ Es **SecureStore**, no AsyncStorage. El backend devuelve `idToken`; el store lo persiste como `accessToken`.
+
+Selectores síncronos para el `api-client`: `getAccessToken()`, `getRefreshToken()`, `updateTokensSync()`, `clearSessionSync()`.
+
+### Refresh Automático
+
+El `api-client` lo maneja solo — el código de feature **no** llama a refresh manualmente:
+
+1. Cada request adjunta `Authorization: Bearer {accessToken}` automáticamente (salvo `skipAuth`).
+2. Si la respuesta es `401` (y no es `skipAuth`):
+   - Llama a `refreshTokenOnce()` → `POST /users/refresh` con body `{ refreshToken }`. Un **mutex** evita refreshes simultáneos: requests paralelos comparten la misma promesa.
+   - Si vuelve `idToken`: `updateTokensSync()` guarda ambos tokens y **reintenta el request original una vez** con el nuevo token.
+   - Si falla: `clearSessionSync()` → vuelve a guest mode (no se reintenta).
+3. Al abrir la app, `useSessionRestore` hidrata desde SecureStore e intenta un refresh silencioso. Solo limpia sesión ante `4xx`; ante red/`5xx` mantiene la sesión local.
 
 ```typescript
-// Interceptor de Axios simplificado
-axios.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
+// shared/infrastructure/api/api-client.ts (simplificado)
+let response = await executeRequest(path, options);
 
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-
-      try {
-        const { data } = await axios.post('/auth/refresh', null, {
-          headers: {
-            'X-Device-Id': deviceId,
-            'X-Device-Name': deviceName,
-          },
-        });
-
-        setAccessToken(data.access_token);
-        originalRequest.headers.Authorization = `Bearer ${data.access_token}`;
-        return axios(originalRequest);
-      } catch {
-        clearSession();
-        navigateToLogin();
-      }
-    }
-
-    return Promise.reject(error);
-  },
-);
+if (response.status === 401 && !options.skipAuth) {
+  const newTokens = await refreshTokenOnce(); // POST /users/refresh { refreshToken }
+  if (newTokens?.idToken) {
+    response = await executeRequest(path, { ...options, token: newTokens.idToken });
+  } else {
+    clearSessionSync(); // vuelve a guest
+  }
+}
 ```
 
 ---
+
+## Envelope de Respuesta
+
+Toda respuesta del backend viene envuelta (`api.types.ts` → `ApiEnvelope`):
+
+```typescript
+interface ApiEnvelope<T> {
+  success: boolean;
+  data: T;        // el recurso real
+  timestamp: string;
+  message?: string;
+}
+```
+
+El `api-client` lo desempaqueta y retorna `{ success, data, timestamp, ok, status }`. **El contenido útil está en `data`** — los shapes de cada `router/*.md` describen `data`.
 
 ## Paginación
 
@@ -107,88 +128,63 @@ Los endpoints de listado usan `POST` con filtros en el body.
 }
 ```
 
-**Esperar:**
-
-```typescript
-{
-  data: T[],
-  meta: {
-    page: number,
-    limit: number,
-    total: number,
-    total_pages: number,
-  }
-}
-```
+**Esperar** (dentro de `data`): `{ data: T[], meta: { page, limit, total, total_pages } }`.
 
 ---
 
 ## Manejo de Errores
 
-### Estructura de errores del backend
+### Estructura de errores del backend (`ApiErrorEnvelope`)
 
 ```typescript
-interface ApiError {
-  error: string; // Tipo de error HTTP
-  message: string; // Descripción general
-  fields?: Array<{
-    // Solo en 422
-    field: string;
-    value: string | null;
-    error: string;
-  }>;
+interface ApiErrorEnvelope {
+  success: false;
+  error: {
+    statusCode: number;
+    code: string;
+    message: string;
+  };
+  timestamp: string;
+}
+```
+
+El `api-client` lanza `ApiHttpError` con `{ message, status, statusCode, code, timestamp }`. **No hay** array `fields[]` por campo — la validación llega como un solo `message`.
+
+```typescript
+try {
+  await someUseCase.execute(input);
+} catch (err) {
+  if (err instanceof ApiHttpError) {
+    if (err.status === 401) { /* el api-client ya intentó refresh */ }
+    else showToast(err.message);
+  }
 }
 ```
 
 ### Cómo manejar cada código
 
-| Código | Qué significa                            | Qué hacer en el frontend                                         |
-| :----- | :--------------------------------------- | :--------------------------------------------------------------- |
-| `400`  | Body malformado o campos faltantes.      | Revisar el payload. No mostrar al usuario — es bug del frontend. |
-| `401`  | Token expirado o credenciales inválidas. | Intentar refresh. Si falla, redirigir a login.                   |
-| `404`  | Recurso no existe.                       | Mostrar mensaje "No encontrado" y navegar atrás.                 |
-| `422`  | Validación fallida.                      | Mostrar errores por campo usando `fields[]`.                     |
-| `500`  | Error del servidor.                      | Mostrar toast genérico: "Algo salió mal, intenta de nuevo".      |
-| `503`  | Servidor no disponible.                  | Mostrar pantalla de mantenimiento o retry.                       |
-| `204`  | Éxito sin body.                          | Acción completada — actualizar UI localmente.                    |
-
-### Mapeo de errores 422 a formularios
-
-```typescript
-const mapFieldErrors = (fields: ApiError['fields']): Record<string, string> => {
-  const errors: Record<string, string> = {};
-  fields?.forEach(({ field, error }) => {
-    errors[field] = error;
-  });
-  return errors;
-};
-
-// Uso en un form
-const onSubmit = async (data: FormData) => {
-  try {
-    await api.post('/auth/register', data);
-  } catch (error) {
-    if (error.response?.status === 422) {
-      const fieldErrors = mapFieldErrors(error.response.data.fields);
-      setErrors(fieldErrors); // Mostrar errores por campo
-    }
-  }
-};
-```
+| Código | Qué significa                            | Qué hacer en el frontend                                    |
+| :----- | :--------------------------------------- | :---------------------------------------------------------- |
+| `400`  | Body malformado o campos faltantes.      | Revisar el payload — bug del frontend.                      |
+| `401`  | Token expirado o credenciales inválidas. | El api-client intenta refresh; si falla → guest/login.      |
+| `404`  | Recurso no existe.                       | Mostrar "No encontrado" y navegar atrás.                    |
+| `409`  | Conflicto (p.ej. email ya registrado).   | Mostrar `error.message`.                                    |
+| `422`  | Validación fallida.                      | Mostrar `error.message` (no hay desglose por campo).        |
+| `500`  | Error del servidor.                      | Toast genérico: "Algo salió mal, intenta de nuevo".         |
+| `503`  | Servidor no disponible.                  | Pantalla de mantenimiento o retry.                          |
+| `204`  | Éxito sin body.                          | Acción completada — actualizar UI localmente.               |
 
 ---
 
 ## Convenciones de Respuesta
 
-| Tipo de endpoint          | Status | Qué esperar                                            |
-| :------------------------ | :----- | :----------------------------------------------------- |
-| Consulta (`GET`)          | `200`  | Objeto o array con datos.                              |
-| Creación (`POST`)         | `201`  | Objeto creado completo. Actualizar store directamente. |
-| Actualización (`PATCH`)   | `200`  | Objeto actualizado completo. Reemplazar en store.      |
-| Acción sin datos (`POST`) | `204`  | Sin body. Confirmar con el status code.                |
-| Eliminación (`DELETE`)    | `204`  | Sin body. Remover del store localmente.                |
-
-> **Regla:** las mutaciones devuelven el recurso actualizado. Nunca hacer un `GET` adicional después de un `POST` o `PATCH`.
+| Tipo de endpoint          | Status      | Qué esperar                                                |
+| :------------------------ | :---------- | :-------------------------------------------------------- |
+| Consulta (`GET`)          | `200`       | Objeto o array en `data`.                                 |
+| Creación (`POST`)         | `201`       | Objeto creado en `data` (cuando aplica).                  |
+| Actualización (`PUT`/`PATCH`) | `200`/`204` | Objeto actualizado o sin body (perfil retorna `void`).   |
+| Acción sin datos (`POST`) | `204`       | Sin body. Confirmar con el status code.                  |
+| Eliminación (`DELETE`)    | `204`       | Sin body. Remover del store localmente.                  |
 
 ---
 
@@ -207,7 +203,7 @@ const onSubmit = async (data: FormData) => {
 
 | Servicio           | Archivo                                                  | Descripción                                                     |
 | :----------------- | :------------------------------------------------------- | :-------------------------------------------------------------- |
-| **Auth**           | [`router/authentication.md`](./router/authentication.md) | Registro, login, Google, refresh, contraseña, perfil, logout.   |
+| **Auth & Users**   | [`router/authentication.md`](./router/authentication.md) | `/users/*` — registro, login, Google, refresh, perfil, contraseña. Logout local. |
 | **Shopping Lists** | [`router/shopping-lists.md`](./router/shopping-lists.md) | CRUD de listas con items en batch. Comparadora de métricas.     |
 | **Finances**       | [`router/finances.md`](./router/finances.md)             | CRUD de ingresos/egresos. Summary del dashboard.                |
 | **Notifications**  | [`router/notifications.md`](./router/notifications.md)   | Listado, lectura, eliminación y preferencias de notificaciones. |
