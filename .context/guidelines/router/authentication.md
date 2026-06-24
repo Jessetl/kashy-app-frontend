@@ -1,38 +1,31 @@
-# 🔐 Auth & Users — `/users`
+# 🔐 Auth — `/api/v1/auth`
 
-> Endpoints de autenticación, sesión, perfil y contraseña.
+> Endpoints de autenticación, contraseña, perfil y sesión.
 > El frontend nunca interactúa con Firebase directamente — todo pasa por el backend.
-> Refleja el código real (`modules/auth`, `modules/profile`, `shared/infrastructure/api`).
 
 ---
 
 ## Resumen
 
-| Emoji | Método | Ruta                   | Auth | Descripción                                  |
-| :---: | ------ | ---------------------- | :--: | -------------------------------------------- |
-|  🟡   | `POST` | `/users/register`      |  ❌  | Registro con email y contraseña.             |
-|  🟡   | `POST` | `/users/login`         |  ❌  | Login con email y contraseña.                |
-|  🟡   | `POST` | `/users/google-auth`   |  ❌  | Login/registro con Google (unificado).       |
-|  🟡   | `POST` | `/users/refresh`       |  ❌  | Renovar tokens. Lo dispara el api-client.    |
-|  🟠   | `PUT`  | `/users/me`            |  ✅  | Actualizar perfil (nombre).                  |
-|  🟠   | `PUT`  | `/users/me/password`   |  ✅  | Cambiar contraseña.                          |
-
-> **No existen** en el frontend: `logout`, `recover-password`, ni `GET` de perfil.
-> El logout es **local** (`clearSession()` borra SecureStore + resetea stores). El usuario llega en el body de login/google-auth.
-
----
-
-## Convenciones
-
-- **Casing:** todo el contrato es `camelCase` (`idToken`, `refreshToken`, `firstName`, `locationLatitude`). No `snake_case`.
-- **Envelope:** las respuestas vienen envueltas → `{ success, data, timestamp }`. Los shapes de abajo describen el contenido de `data`.
-- `skipAuth: true` en login/register/google-auth/refresh (no adjuntan `Authorization`).
+| Emoji | Método  | Ruta                     | Auth | Descripción                      |
+| :---: | ------- | ------------------------ | :--: | -------------------------------- |
+|  🟡   | `POST`  | `/auth/register`         |  ❌  | Registro con email y contraseña. |
+|  🟡   | `POST`  | `/auth/login`            |  ❌  | Login con email y contraseña.    |
+|  🟡   | `POST`  | `/auth/login/google`     |  ❌  | Login con Google.                |
+|  🟡   | `POST`  | `/auth/refresh`          |  ❌  | Renovar JWT expirado.            |
+|  🟡   | `POST`  | `/auth/recover-password` |  ❌  | Enviar email de recuperación.    |
+|  🟡   | `POST`  | `/auth/change-password`  |  ✅  | Cambiar contraseña.              |
+|  🟢   | `GET`   | `/auth/profile`          |  ✅  | Obtener perfil.                  |
+|  🟠   | `PATCH` | `/auth/profile`          |  ✅  | Actualizar perfil.               |
+|  🟡   | `POST`  | `/auth/logout`           |  ✅  | Cerrar sesión.                   |
 
 ---
 
 ## Endpoints
 
-### 🟡 `POST /users/register`
+### 🟡 `POST /auth/register`
+
+**Headers:** `X-Device-Id`, `X-Device-Name`
 
 **Enviar:**
 
@@ -40,23 +33,38 @@
 {
   "email": "string",
   "password": "string",
-  "firstName": "string",
-  "lastName": "string",
-  "country": "VE",
-  "locationLatitude": 0.0,
-  "locationLongitude": 0.0
+  "first_name": "string | null",
+  "last_name": "string | null"
 }
 ```
 
-**Esperar `201`:** sin sesión — el registro **no** auto-loguea (`register()` retorna `void`).
+**Esperar `201`:**
 
-**Acción en frontend:** mostrar éxito y dirigir al login.
+```json
+{
+  "access_token": "string",
+  "expires_in": 900,
+  "user": {
+    "id": "uuid",
+    "email": "string",
+    "first_name": "string | null",
+    "last_name": "string | null",
+    "avatar_url": null,
+    "subscription_plan": "FREE",
+    "country_code": "VE"
+  }
+}
+```
 
-**Errores:** `400`, `409`, `422`
+**Acción en frontend:** Guardar `access_token` en Zustand + AsyncStorage. Guardar `user` en el store. Navegar a Dashboard con replace.
+
+**Errores:** `400`, `401`, `422`
 
 ---
 
-### 🟡 `POST /users/login`
+### 🟡 `POST /auth/login`
+
+**Headers:** `X-Device-Id`, `X-Device-Name`
 
 **Enviar:**
 
@@ -67,124 +75,174 @@
 }
 ```
 
-**Esperar `200`** (dentro de `data`):
+**Esperar `200`:**
 
 ```json
 {
-  "idToken": "string",
-  "refreshToken": "string",
-  "expiresIn": "900",
+  "access_token": "string",
+  "expires_in": 900,
   "user": {
     "id": "uuid",
     "email": "string",
-    "firstName": "string",
-    "lastName": "string",
-    "displayName": "string | undefined",
-    "firebaseUid": "string"
+    "first_name": "string | null",
+    "last_name": "string | null",
+    "avatar_url": "string | null",
+    "subscription_plan": "string",
+    "country_code": "string"
   }
 }
 ```
 
-**Acción en frontend:** `setSession()` → guarda `idToken` (como `accessToken`) + `refreshToken` + `user` en Zustand y **SecureStore**. Cierra modal de login. Ejecuta `pendingAction` si existe.
+**Acción en frontend:** Guardar `access_token` y `user` en store. Cerrar modal de login. Recargar datos del dashboard.
 
 **Errores:** `400`, `401`
 
 ---
 
-### 🟡 `POST /users/google-auth`
+### 🟡 `POST /auth/login/google`
+
+**Headers:** `X-Device-Id`, `X-Device-Name`
 
 **Enviar:**
 
 ```json
 {
-  "idToken": "string | null",
-  "accessToken": "string | null",
-  "country": "VE",
-  "locationLatitude": 0.0,
-  "locationLongitude": 0.0
+  "google_id_token": "string"
 }
 ```
 
-> `idToken`/`accessToken` se obtienen con Google Sign-In SDK en RN. Flujo unificado: crea cuenta si no existe, si no loguea.
+> El `google_id_token` se obtiene usando Google Sign-In SDK en React Native. El frontend se autentica con Google, obtiene el token y lo envía al backend.
 
-**Esperar `200`:** mismo shape que login.
+**Esperar `200`:** Mismo shape que login.
 
-**Acción en frontend:** igual que login.
+**Acción en frontend:** Igual que login.
 
 **Errores:** `400`, `401`
 
 ---
 
-### 🟡 `POST /users/refresh`
+### 🟡 `POST /auth/refresh`
 
-> **No se llama manualmente.** Lo dispara el `api-client` automáticamente ante un `401`, con un mutex que evita refresh simultáneos (`refreshTokenOnce`). También lo usa `useSessionRestore` al abrir la app.
+**Headers:** `X-Device-Id`, `X-Device-Name` (sin `Authorization`)
 
-**Enviar:**
+**Enviar:** Body vacío.
 
-```json
-{ "refreshToken": "string" }
-```
-
-**Esperar `200`** (dentro de `data`):
+**Esperar `200`:**
 
 ```json
 {
-  "idToken": "string",
-  "refreshToken": "string",
-  "expiresIn": "900"
+  "access_token": "string",
+  "expires_in": 900
 }
 ```
 
-**Acción en frontend:** `updateTokens()` reemplaza ambos tokens en Zustand + SecureStore y reintenta **una** vez el request original con el nuevo `idToken`.
+**Acción en frontend:** Reemplazar `access_token` en Zustand + AsyncStorage. Reintentar el request original que falló con `401`.
 
-**Si falla** (`!response.ok` o sin tokens): `clearSession()` → vuelve a guest. No se reintenta.
+**Errores:**
 
----
-
-### 🟠 `PUT /users/me`
-
-**Headers:** `Authorization`
-
-**Enviar:** solo nombre.
-
-```json
-{
-  "firstName": "string",
-  "lastName": "string"
-}
-```
-
-**Esperar:** `200`/`204`. El datasource retorna `void` — actualizar `user` en store localmente (`updateUser`).
-
-**Errores:** `400`, `401`, `422`
+- `401` → Refresh token revocado o expirado. Limpiar sesión y redirigir a login.
+- `404` → Dispositivo no registrado. Redirigir a login.
 
 ---
 
-### 🟠 `PUT /users/me/password`
+### 🟡 `POST /auth/recover-password`
 
-**Headers:** `Authorization`
+**Headers:** Ninguno requerido.
 
 **Enviar:**
 
 ```json
 {
-  "currentPassword": "string",
-  "newPassword": "string"
+  "email": "string"
 }
 ```
 
-**Esperar:** `200`/`204`. Retorna `void`.
+**Esperar:** `204 No Content` (sin body).
 
-**Acción en frontend:** mostrar confirmación.
+**Acción en frontend:** Mostrar mensaje de confirmación: "Revisa tu correo". Navegar de vuelta al login modal.
+
+**Errores:** `400`, `422`
+
+---
+
+### 🟡 `POST /auth/change-password`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
+
+**Enviar:**
+
+```json
+{
+  "current_password": "string",
+  "new_password": "string"
+}
+```
+
+**Esperar:** `204 No Content` (sin body).
+
+**Acción en frontend:** Mostrar confirmación. Nota: otros dispositivos serán deslogueados automáticamente por el backend.
 
 **Errores:** `400`, `401`, `422`
 
 ---
 
-## Logout (local, sin endpoint)
+### 🟢 `GET /auth/profile`
 
-No hay `POST /logout`. El flujo:
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
 
-1. `clearSession()` — borra estado de auth + `secureStorage.removeItem('auth-session')`.
-2. Reset de stores cross-módulo (`use-reset-debts`, `use-reset-supermarket`).
-3. Navegar a Dashboard como guest.
+**Esperar `200`:**
+
+```json
+{
+  "id": "uuid",
+  "email": "string",
+  "first_name": "string | null",
+  "last_name": "string | null",
+  "avatar_url": "string | null",
+  "subscription_plan": "string",
+  "country_code": "string"
+}
+```
+
+**Acción en frontend:** Actualizar `user` en el store.
+
+**Errores:** `401`, `404`
+
+---
+
+### 🟠 `PATCH /auth/profile`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
+
+**Enviar:** Solo los campos que cambian.
+
+```json
+{
+  "first_name": "string | null",
+  "last_name": "string | null",
+  "avatar_url": "string | null",
+  "country_code": "string | null",
+  "latitude": "number | null",
+  "longitude": "number | null"
+}
+```
+
+**Esperar `200`:** Objeto `user` actualizado (mismo shape que GET profile).
+
+**Acción en frontend:** Reemplazar `user` en el store con la respuesta.
+
+**Errores:** `400`, `401`, `422`
+
+---
+
+### 🟡 `POST /auth/logout`
+
+**Headers:** `Authorization`, `X-Device-Id`, `X-Device-Name`
+
+**Enviar:** Body vacío.
+
+**Esperar:** `204 No Content` (sin body).
+
+**Acción en frontend:** Limpiar `access_token` y `user` de Zustand + AsyncStorage. Navegar a Dashboard (como guest).
+
+**Errores:** `401`, `404`
